@@ -25,6 +25,10 @@ export ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN:-dummy}
 export ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-dummy}
 export ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-$MODEL_ALIAS}
 export ANTHROPIC_SMALL_FAST_MODEL=${ANTHROPIC_SMALL_FAST_MODEL:-$MODEL_ALIAS}
+# CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 suppresses background/telemetry
+# requests. With PARALLEL=1 the llama.cpp server has a single KV slot, so an
+# unrelated request between coding turns can evict the cached system-prompt
+# prefix; disabling that traffic keeps the prefix cache warm for the session.
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-1}
 
 exec claude "$@"

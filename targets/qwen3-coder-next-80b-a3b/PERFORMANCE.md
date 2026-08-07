@@ -85,6 +85,37 @@ by any single request and must never be quoted as a per-user speed.
 6. **Do not transfer FP8/Hopper/Blackwell benchmarks to Turing.** They do not
    apply to sm_75.
 
+## Prompt / prefix caching for coding agents
+
+Coding-agent CLIs resend a large, stable system prompt + tool schema every turn.
+Caching that prefix removes almost all repeated prefill for short follow-ups, so
+it is the single biggest interactive-latency win once a session is warm. It does
+**not** speed up the first (cache-cold) request or the decode phase.
+
+- **llama.cpp** (`llama-cpp-q4km`): explicit `--cache-prompt`, `--cache-ram
+  32768`, `--cache-idle-slots`, `--cache-reuse 256`, `--slot-prompt-similarity
+  0.01`, `--metrics`. 32 GiB of host-RAM cache is safe here — the 45 GiB Q4_K_M
+  weights are resident in VRAM, not host RAM, so the cache only competes with OS
+  page cache on the 251 GiB host. Do not raise toward `--cache-ram -1` without
+  monitoring host RAM.
+- **vLLM** (`vllm-fp16-*`): `--enable-prefix-caching --mamba-cache-mode align
+  --prefix-caching-hash-algo sha256`. `align` is experimental and specific to the
+  GatedDeltaNet/Mamba layers; KV dtype stays FP16 on Turing.
+
+Effect on the numbers above: prefix caching improves **warm-session
+time-to-first-token / effective prefill** for repeated prompts; it does not
+change the steady-state decode tok/s or the cache-cold prefill figures, which is
+why the tables are unchanged. Record cache-warm and cache-cold separately.
+
+To measure a clean cache-cold prefill baseline, copy the profile and set
+`CACHE_PROMPT=0` for llama.cpp, or set `ENABLE_PREFIX_CACHING=0`,
+`MAMBA_CACHE_MODE=""`, and `PREFIX_CACHING_HASH_ALGO=""` for vLLM. Profile files
+load after `config.env`, so a dedicated benchmark profile is required. Then
+re-enable and re-send the identical prompt to observe the warm delta via
+`/metrics` (see the target README verification commands). Exact vLLM
+prefix-cache metric names must be confirmed on this host's running server before
+being cited.
+
 ## Validation checklist before trusting any number
 
 - [ ] Complete the BF16 download (for vLLM profiles) or the Unsloth
@@ -92,7 +123,8 @@ by any single request and must never be quoted as a per-user speed.
 - [ ] Load-and-generate test: confirm llama.cpp actually runs `qwen3_next` on
       this `b10298`, sm_75 build.
 - [ ] Record decode and prefill separately, with server-reported token counts,
-      a fixed seed, and prompt-cache disabled.
+      a fixed seed, and a copied cache-disabled profile for the cache-cold
+      baseline; then record the cache-warm delta with caching enabled.
 - [ ] Sweep `llama-cpp-q4km` vs `vllm-fp16-tp2pp2` vs `vllm-fp16-tp4`.
 - [ ] Replace each projected cell above with the measured value and its run
       reference; move confirmed results into "Measured results".

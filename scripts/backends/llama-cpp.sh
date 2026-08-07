@@ -38,6 +38,31 @@ if [[ -n "${CACHE_TYPE_V:-}" ]]; then
   args+=(--cache-type-v "$CACHE_TYPE_V")
 fi
 
+# Explicit prompt/prefix caching knobs (b10298). llama-server already defaults
+# to --cache-prompt on, --cache-ram 8192 MiB, and --cache-idle-slots on, so
+# these are only appended when a profile opts in, keeping existing targets
+# (e.g. DeepSeek) on the stock defaults. Prefix matching is exact: any change to
+# the system prompt, tool schemas, timestamps, or message ordering invalidates
+# the cached prefix.
+if [[ "${CACHE_PROMPT:-1}" == 0 ]]; then
+  args+=(--no-cache-prompt)
+fi
+if [[ -n "${CACHE_RAM_MIB:-}" ]]; then
+  args+=(--cache-ram "$CACHE_RAM_MIB")
+fi
+if [[ "${CACHE_IDLE_SLOTS:-1}" == 0 ]]; then
+  args+=(--no-cache-idle-slots)
+fi
+if [[ -n "${CACHE_REUSE:-}" ]]; then
+  args+=(--cache-reuse "$CACHE_REUSE")
+fi
+if [[ -n "${SLOT_PROMPT_SIMILARITY:-}" ]]; then
+  args+=(--slot-prompt-similarity "$SLOT_PROMPT_SIMILARITY")
+fi
+if [[ "${ENABLE_METRICS:-0}" != 0 ]]; then
+  args+=(--metrics)
+fi
+
 if [[ "${DSPARK:-0}" != 0 ]]; then
   require_file "$DRAFT_MODEL"
   args+=(

@@ -146,6 +146,91 @@ uses the OpenAI-compatible `/v1` endpoint and therefore works with either
 backend. Both wrappers health-check the server first and export the correct
 model alias (`qwen3-coder-next`) and base URL.
 
+## Prompt / prefix caching
+
+Coding-agent CLIs (GitHub Copilot CLI, Claude Code) resend a large, stable
+system prompt plus the tool schema on every turn. Caching that prefix skips
+re-prefilling it, which is the dominant cost for short follow-up messages. Both
+backends are configured for this in the Qwen profiles; other targets keep the
+stock defaults because the knobs are only applied when a profile sets them.
+
+### What is enabled
+
+**llama.cpp (`llama-cpp-q4km`)** — the `b10298` server already defaults to
+`--cache-prompt` on, `--cache-ram 8192`, and `--cache-idle-slots` on. The
+profile makes caching explicit and tunes it for a single interactive session:
+
+| Env var | Flag | Value | Why |
+|---|---|---|---|
+| `CACHE_RAM_MIB` | `--cache-ram` | `32768` | 32 GiB host-RAM prompt cache. Safe on the 251 GiB host: Q4_K_M weights (45 GiB) live in VRAM, so the cache competes only with OS page cache. |
+| `CACHE_REUSE` | `--cache-reuse` | `256` | Reuse cached chunks ≥256 tokens via KV shifting even on a partial prefix match. `0` (server default) disables partial reuse. |
+| `SLOT_PROMPT_SIMILARITY` | `--slot-prompt-similarity` | `0.01` | With `PARALLEL=1` there is one slot; a low threshold reattaches the session to its slot instead of evicting it. |
+| `ENABLE_METRICS` | `--metrics` | on | Exposes the Prometheus `/metrics` endpoint for verification. |
+| `CACHE_PROMPT` / `CACHE_IDLE_SLOTS` | `--no-*` | `1`/`1` | Kept on; set to `0` to disable (e.g. a cache-cold benchmark). |
+
+**vLLM (`vllm-fp16-tp2pp2`, `vllm-fp16-tp4`)** — automatic prefix caching (APC)
+is off by default for the Qwen3-Next hybrid model, so the profiles enable it:
+
+| Env var | Flag | Value | Why |
+|---|---|---|---|
+| `ENABLE_PREFIX_CACHING` | `--enable-prefix-caching` | on | Turns on APC. |
+| `MAMBA_CACHE_MODE` | `--mamba-cache-mode` | `align` | Required for the GatedDeltaNet/Mamba layers. **Experimental.** |
+| `PREFIX_CACHING_HASH_ALGO` | `--prefix-caching-hash-algo` | `sha256` | Collision-resistant prefix hash (the default). |
+
+KV-cache dtype stays `auto`/FP16 on Turing (no FP8/BF16 tensor cores). The
+installed default vLLM (0.17.1) uses coarse ~544-token cache blocks for this
+hybrid model; the base env (0.21.0) may offer 16-token blocks via `BLOCK_SIZE`,
+but do **not** switch runtimes until that path and `qwen3_next` compatibility are
+validated on this host.
+
+### Copilot / Claude launcher tie-ins
+
+- `copilot-local.sh` now derives `COPILOT_PROVIDER_MAX_PROMPT_TOKENS` from the
+  loaded context (`MAX_MODEL_LEN` for vLLM, `CTX_SIZE` for llama.cpp) minus the
+  output budget, instead of a hardcoded `65536`. A prompt budget larger than the
+  served context makes the agent build prompts the server must truncate, which
+  also breaks exact-prefix reuse. Example: `vllm-fp16-tp2pp2` (32768 ctx) →
+  `24576` prompt tokens; `llama-cpp-q4km` (65536 ctx) → `57344`.
+- `COPILOT_PROVIDER_WIRE_API` stays `completions`. The installed CLI (1.0.79-6)
+  accepts only `completions` or `responses` (`chat` is rejected as
+  "Invalid wire API format"), and text completions still share byte-identical
+  prompt prefixes for server-side caching.
+- `claude-local.sh` keeps `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`: with a
+  single KV slot, an unrelated background request between turns can evict the
+  cached system-prompt prefix.
+
+### Verifying cache hits
+
+Prefix matching is **exact**: any change to the system prompt, tool schemas,
+timestamps, message ordering, or chat template invalidates the cached prefix.
+It is **not a security boundary** — run a single trusted user/server (or use
+per-tenant salts if the client/API supports them).
+
+llama.cpp (`llama-cpp-q4km`, port 8000 — server logs report slot reuse):
+
+```bash
+# Prometheus counters (requires ENABLE_METRICS=1)
+curl -s http://127.0.0.1:8000/metrics | grep -iE 'prompt|kv|cache'
+# Per-request timings: send the same long prompt twice; on the 2nd call the
+# server-reported prompt-eval time drops sharply and the log shows a slot reuse
+# line ("slot ... reuse ... n_past").
+curl -s http://127.0.0.1:8000/v1/chat/completions -H 'Content-Type: application/json' \
+  -d '{"model":"qwen3-coder-next","messages":[{"role":"user","content":"<long stable prompt>"}],"max_tokens":1}' | jq '.timings // .usage'
+```
+
+vLLM (`vllm-fp16-*`, port 8000 — APC exposes hit-rate gauges):
+
+```bash
+# Exact metric names vary by vLLM version; grep for the prefix-cache series and
+# watch the hit counter rise on the second identical request.
+curl -s http://127.0.0.1:8000/metrics | grep -iE 'prefix_cache'
+```
+
+Honest limitations: these are **projected/operational** guidance, not measured
+RTX 8000 results (see PERFORMANCE.md). The `qwen3_next` load-and-generate test,
+the experimental `align` Mamba cache mode, and the exact vLLM metric names on
+this host must all be confirmed on a real run before the numbers are trusted.
+
 ## Status and blockers
 
 - **Local BF16 download is incomplete.** Shards `00003` and `00039` of 40 are

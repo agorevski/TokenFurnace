@@ -17,11 +17,11 @@ args=(
   --batch-size "$BATCH_SIZE"
   --ubatch-size "$UBATCH_SIZE"
   --n-gpu-layers 99
-  --split-mode layer
-  --tensor-split 1,1,1,1
+  --split-mode "${SPLIT_MODE:-layer}"
+  --tensor-split "${TENSOR_SPLIT:-1,1,1,1}"
   --fit on
   --fit-target 2048
-  --flash-attn on
+  --flash-attn "${FLASH_ATTN:-on}"
   --jinja
   --temp 1.0
   --top-p 0.95
@@ -30,6 +30,13 @@ args=(
   --host "$SERVER_HOST"
   --port "$SERVER_PORT"
 )
+
+if [[ -n "${CACHE_TYPE_K:-}" ]]; then
+  args+=(--cache-type-k "$CACHE_TYPE_K")
+fi
+if [[ -n "${CACHE_TYPE_V:-}" ]]; then
+  args+=(--cache-type-v "$CACHE_TYPE_V")
+fi
 
 if [[ "${DSPARK:-0}" != 0 ]]; then
   require_file "$DRAFT_MODEL"

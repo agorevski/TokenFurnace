@@ -23,6 +23,11 @@ links reported at 25.781 GB/s each; traffic between pairs crosses PCIe host
 bridges. Tensor-parallel profiles must therefore account for a slower
 cross-pair collective path.
 
+Machine-readable values for every field above (plus aggregate VRAM/bandwidth,
+PCIe generation, CPU/NUMA, OS/kernel, driver/CUDA/toolchain, and installed
+runtime versions and paths) are in [`profile.env`](profile.env), snapshotted
+2026-08-07. PCIe links idle at gen 1 and negotiate up to gen 3 x16 under load.
+
 ## Firmware and driver snapshot
 
 Recorded on 2026-08-06:
@@ -61,13 +66,14 @@ not provide native BF16, TF32, FP8, or FP4 tensor-core execution. Consequences:
 |---|---|---|
 | NVIDIA CUDA | Fully supported by the installed driver | All GPU backends |
 | NCCL | Working; used by the llama.cpp build | Multi-GPU collectives |
-| llama.cpp | Working with CUDA, NCCL, Flash Attention, MMQ, and GGUF | DeepSeek baseline and compatibility fallback |
+| llama.cpp | Working with CUDA, NCCL, Flash Attention, MMQ, and GGUF; `qwen3_next`/DeltaNet upstream since ~`b7186` | DeepSeek baseline; **fastest single-request Qwen path** (`Q4_K_M`) |
 | vLLM | Formally supports NVIDIA compute capability 7.0+ | Preferred first Qwen server, subject to model-kernel validation |
 | FlashAttention 2 | Requires Ampere or newer | Not available |
 | xFormers | Traditional vLLM fallback for pre-Ampere GPUs | Not installed in the current vLLM environment |
 | vLLM Triton attention | Available in current vLLM builds | Candidate Turing attention backend |
-| SGLang | Framework supports Qwen3-Coder-Next; local `sm_75` path unvalidated | Candidate after vLLM |
-| TensorRT-LLM | Current environment does not contain TensorRT-LLM | Not selected until architecture and Turing kernels are verified |
+| SGLang | Framework lists Qwen3-Coder-Next, but the local `sm_75` path is unvalidated and considered risky | Not recommended on Turing without a passing load test |
+| ExLlama / ExLlamaV2 | Kernels target Ampere+ ; `sm_75` support is unreliable for this architecture | Not recommended on Turing |
+| TensorRT-LLM | Current TensorRT-LLM releases exclude Turing (`sm_75`) support | **Not recommended**; do not select for this model |
 | Transformers | Supports the model architecture in the installed versions | Correctness fallback, not expected to be fastest |
 
 Framework-level GPU support does not guarantee that every model-specific MoE,
@@ -89,14 +95,22 @@ CUDA extension compatibility than the base Python 3.13 environment.
 
 ## Backend selection guidance
 
-1. Try current vLLM FP16 tensor parallelism first for Qwen3-Coder-Next.
-2. If a model-specific fused kernel rejects `sm_75`, test the supported fallback
+1. Choose the runtime by goal, not by habit:
+   - **Fastest single request / lowest latency** → llama.cpp with the official
+     GGUF `Q4_K_M` (`qwen3-coder-next-80b-a3b llama-cpp-q4km`).
+   - **Highest aggregate serving throughput / bulk prefill** → vLLM FP16 mapped
+     onto the NVLink pairs (`vllm-fp16-tp2pp2`, `TP2 x PP2`).
+2. Map tensor parallelism onto the NVLink pairs (0-1 and 2-3). `TP2 x PP2` keeps
+   every all-reduce on NVLink and sends only pipeline activations across the
+   slow cross-pair PCIe path; benchmark it against topology-agnostic `TP4`.
+3. Run unquantized weights as FP16, not BF16: Turing has no BF16 tensor cores.
+4. If a model-specific fused kernel rejects `sm_75`, test the supported fallback
    implementation before changing frameworks.
-3. Use a verified Turing-compatible weight-only quantization only if it improves
-   measured throughput, not merely VRAM usage.
-4. Keep llama.cpp/GGUF as the broadest compatibility path and single-user
-   latency baseline.
-5. Do not assume FP8 or Blackwell/Hopper benchmark results transfer to Turing.
+5. Use a verified Turing-compatible weight-only quantization only when it
+   improves measured throughput or latency, not merely VRAM usage.
+6. Do not select TensorRT-LLM for this model (no Turing support), and treat
+   SGLang/ExLlama as unproven on `sm_75` until a load test passes.
+7. Do not assume FP8 or Blackwell/Hopper benchmark results transfer to Turing.
 
 ## Operational checks
 

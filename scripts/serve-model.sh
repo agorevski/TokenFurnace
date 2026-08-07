@@ -11,7 +11,8 @@ Usage: serve-model.sh TARGET [PROFILE] [-- extra backend arguments]
 
 Examples:
   serve-model.sh deepseek-v4-flash-0731 q4-balanced
-  serve-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp4
+  serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
+  serve-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2
 EOF
 }
 

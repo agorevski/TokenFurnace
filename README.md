@@ -15,7 +15,7 @@ tuning profile rather than around one model.
 | Target | Backend | Status |
 |---|---|---|
 | [DeepSeek V4 Flash 0731](targets/deepseek-v4-flash-0731/) | llama.cpp + DSpark | Optimized and measured |
-| [Qwen3-Coder-Next 80B-A3B](targets/qwen3-coder-next-80b-a3b/) | vLLM baseline | Initial bring-up |
+| [Qwen3-Coder-Next 80B-A3B](targets/qwen3-coder-next-80b-a3b/) | llama.cpp Q4_K_M (default) / vLLM FP16 | Architecture defined, targets projected, not yet measured |
 
 ## Layout
 
@@ -36,17 +36,37 @@ DeepSeek balanced profile:
 ./scripts/serve-model.sh deepseek-v4-flash-0731 q4-balanced
 ```
 
-Qwen initial vLLM profile:
+Qwen fastest single-request profile (llama.cpp `Q4_K_M`, the default):
 
 ```bash
-./scripts/download-model.sh qwen3-coder-next-80b-a3b
-./scripts/serve-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp4
+./scripts/download-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
+./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
 ```
 
-Benchmark a running target:
+Qwen highest-throughput profile (vLLM FP16, NVLink-pair-aware `TP2 x PP2`):
 
 ```bash
-./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b
+./scripts/download-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2
+./scripts/serve-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2
+```
+
+Benchmark a running target (single-request latency, or aggregate throughput):
+
+```bash
+./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
+./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km -- --prompt-file PROMPT.txt --max-tokens 1
+./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2 -- --concurrency 16 --requests 64
+```
+
+The prompt-rate fields are end-to-end API rates. With `--max-tokens 1` and a
+long prompt they are useful prefill-oriented comparisons, but they are not
+server-internal kernel timings.
+
+Point coding agents at the local server:
+
+```bash
+./scripts/copilot-local.sh qwen3-coder-next-80b-a3b llama-cpp-q4km   # OpenAI /v1 (either backend)
+./scripts/claude-local.sh  qwen3-coder-next-80b-a3b llama-cpp-q4km   # Anthropic API (llama.cpp)
 ```
 
 Inspect status:

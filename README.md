@@ -65,6 +65,9 @@ In another terminal:
 
 Run any main script with `--help` for usage.
 
+See [PERFORMANCE_TESTS.md](PERFORMANCE_TESTS.md) for the controlled Q4 DSpark
+draft-depth and confidence-threshold experiments.
+
 ## Model profiles
 
 ### Q4 speed profile
@@ -112,7 +115,10 @@ Defaults:
 - Default MMQ kernels outperformed forced cuBLAS.
 - `--parallel 1` maximizes single-session throughput.
 - DSpark `--spec-draft-n-max 2` performed better than the documented default 3
-  on this hardware and workload.
+  as a balanced setting across the tested workloads.
+- Deeper drafts can be faster for predictable output. The best synthetic result
+  was 43.8 tok/s with draft maximum 5 and confidence threshold 0.40, but that
+  profile was slower than the default on natural prose.
 
 ### Settings that did not help
 
@@ -169,6 +175,7 @@ Examples:
 CTX_SIZE=131072 PARALLEL=2 ./scripts/serve-q4.sh
 SERVER_PORT=8091 ./scripts/serve-q8.sh
 DSPARK=0 ./scripts/serve-q4.sh
+SPEC_DRAFT_N_MAX=5 SPEC_DRAFT_P_MIN=0.40 ./scripts/serve-q4.sh
 ```
 
 ## Further speed options

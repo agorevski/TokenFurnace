@@ -19,7 +19,8 @@ Options:
   -h, --help            Show help
 
 Environment overrides:
-  MODEL, DRAFT_MODEL, BATCH_SIZE, UBATCH_SIZE, SPEC_DRAFT_N_MAX
+  MODEL, DRAFT_MODEL, BATCH_SIZE, UBATCH_SIZE
+  SPEC_DRAFT_N_MAX, SPEC_DRAFT_P_MIN
 EOF
 }
 
@@ -97,6 +98,7 @@ if [[ "$dspark" != 0 ]]; then
     --spec-draft-model "$DRAFT_MODEL"
     --spec-type draft-dspark
     --spec-draft-n-max "${SPEC_DRAFT_N_MAX:-2}"
+    --spec-draft-p-min "${SPEC_DRAFT_P_MIN:-0}"
     --spec-draft-ngl 99
   )
 fi

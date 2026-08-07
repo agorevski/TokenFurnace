@@ -5,12 +5,18 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
 
+target=${1:-deepseek-v4-flash-0731}
+profile=${2:-}
+if (($#)); then shift; fi
+if (($#)); then shift; fi
+load_target "$target" "$profile"
+
 require_command curl
 require_command copilot
 
 provider_url=${COPILOT_PROVIDER_BASE_URL:-http://$SERVER_HOST:$SERVER_PORT/v1}
 curl -sf --max-time 3 "http://$SERVER_HOST:$SERVER_PORT/health" >/dev/null \
-  || die "llama-server is not healthy at http://$SERVER_HOST:$SERVER_PORT; run scripts/serve-q4.sh"
+  || die "model server is not healthy at http://$SERVER_HOST:$SERVER_PORT"
 
 export COPILOT_ENABLE_ALT_PROVIDERS=true
 export COPILOT_PROVIDER_BASE_URL=$provider_url

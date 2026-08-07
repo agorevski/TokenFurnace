@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 usage() {
   cat <<'EOF'
-Usage: build-llama.sh [--clean]
+Usage: build-llama-cpp.sh [--clean]
 
 Builds current llama.cpp for four RTX 8000 GPUs:
   CUDA architecture 75

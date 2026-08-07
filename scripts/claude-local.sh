@@ -5,12 +5,20 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
 
+target=${1:-deepseek-v4-flash-0731}
+profile=${2:-}
+if (($#)); then shift; fi
+if (($#)); then shift; fi
+load_target "$target" "$profile"
+[[ "$BACKEND" == llama.cpp ]] \
+  || die "direct Anthropic compatibility is currently configured only for llama.cpp targets"
+
 require_command curl
 require_command claude
 
 base_url=${ANTHROPIC_BASE_URL:-http://$SERVER_HOST:$SERVER_PORT}
 curl -sf --max-time 3 "$base_url/health" >/dev/null \
-  || die "llama-server is not healthy at $base_url; run scripts/serve-q4.sh"
+  || die "model server is not healthy at $base_url"
 
 export ANTHROPIC_BASE_URL=$base_url
 export ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN:-dummy}

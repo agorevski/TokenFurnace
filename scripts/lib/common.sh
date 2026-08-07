@@ -11,17 +11,8 @@ if [[ -f "$PROJECT_DIR/config.env" ]]; then
   set +a
 fi
 
-MODEL_DIR=${MODEL_DIR:-/home/algore/models/dsv4-0731}
-LLAMA_DIR=${LLAMA_DIR:-/home/algore/llama.cpp-dspark-current}
-BUILD_DIR=${BUILD_DIR:-$LLAMA_DIR/build-peer2048}
-MODEL_ALIAS=${MODEL_ALIAS:-deepseek-v4-flash}
+HARDWARE_PROFILE=${HARDWARE_PROFILE:-4x-rtx8000}
 SERVER_HOST=${SERVER_HOST:-127.0.0.1}
-SERVER_PORT=${SERVER_PORT:-8090}
-
-Q4_MODEL=${Q4_MODEL:-$MODEL_DIR/UD-IQ4_XS/DeepSeek-V4-Flash-0731-UD-IQ4_XS-00001-of-00004.gguf}
-Q8_MODEL=${Q8_MODEL:-$MODEL_DIR/UD-Q8_K_XL/DeepSeek-V4-Flash-0731-UD-Q8_K_XL-00001-of-00005.gguf}
-IQ3_MODEL=${IQ3_MODEL:-$MODEL_DIR/UD-IQ3_XXS/DeepSeek-V4-Flash-0731-UD-IQ3_XXS-00001-of-00004.gguf}
-DRAFT_MODEL=${DRAFT_MODEL:-$MODEL_DIR/dspark-DeepSeek-V4-Flash-0731-Q8_0.gguf}
 
 die() {
   printf 'error: %s\n' "$*" >&2
@@ -34,6 +25,35 @@ require_command() {
 
 require_file() {
   [[ -f "$1" ]] || die "required file not found: $1"
+}
+
+load_env_file() {
+  local path=$1
+  require_file "$path"
+  set -a
+  # shellcheck disable=SC1090
+  source "$path"
+  set +a
+}
+
+load_hardware() {
+  load_env_file "$PROJECT_DIR/hardware/$HARDWARE_PROFILE/profile.env"
+}
+
+load_target() {
+  local target=$1
+  local profile=${2:-}
+  local target_dir=$PROJECT_DIR/targets/$target
+
+  load_hardware
+  load_env_file "$target_dir/target.env"
+  profile=${profile:-$DEFAULT_PROFILE}
+  load_env_file "$target_dir/profiles/$profile.env"
+
+  TARGET=$target
+  PROFILE=$profile
+  TARGET_DIR=$target_dir
+  export TARGET PROFILE TARGET_DIR
 }
 
 add_runtime_libraries() {

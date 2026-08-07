@@ -5,7 +5,11 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
 
-printf '%s\n' '=== server ==='
+target=${1:-deepseek-v4-flash-0731}
+profile=${2:-}
+load_target "$target" "$profile"
+
+printf '=== target: %s / %s ===\n' "$TARGET" "$PROFILE"
 if curl -sf --max-time 3 "$(health_url)" >/dev/null; then
   printf 'healthy: http://%s:%s\n' "$SERVER_HOST" "$SERVER_PORT"
   printf '%s\n' '=== slots ==='
@@ -15,7 +19,7 @@ else
 fi
 
 printf '%s\n' '=== process ==='
-pgrep -af 'llama-server' || true
+pgrep -af 'llama-server|vllm serve|vllm.entrypoints' || true
 
 printf '%s\n' '=== GPUs ==='
 nvidia-smi --query-gpu=index,name,memory.used,memory.free,utilization.gpu,power.draw \

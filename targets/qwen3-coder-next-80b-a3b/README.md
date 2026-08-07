@@ -46,9 +46,10 @@ quantization (GGUF `Q4_K_M`/`Q8_0`) that ships an sm_75 kernel. See the
 
 | Profile | Backend | Parallelism | Purpose |
 |---|---|---|---|
-| `llama-cpp-q4km` (default) | llama.cpp | layer split x4 | Fastest single-request decode / lowest latency |
-| `vllm-fp16-tp2pp2` | vLLM FP16 | TP2 x PP2 (NVLink-pair aware) | Highest aggregate serving throughput / prefill |
-| `vllm-fp16-tp4` | vLLM FP16 | TP4 | Original topology-agnostic FP16 baseline |
+| `llama-cpp-q4km` (default) | llama.cpp | layer split x4 | **Measured** best for long coding-agent prompts (fastest 4096-token prefill: 2820 tok/s); decode 88.5 tok/s |
+| `llama-cpp-q4km-2gpu` | llama.cpp | layer split x2 (NVLink pair 0-1) | **Measured** fastest single-request decode: 100.4 tok/s (+13.5% vs 4-GPU), at lower long-prefill throughput |
+| `vllm-fp16-tp2pp2` | vLLM FP16 | TP2 x PP2 (NVLink-pair aware) | Highest aggregate serving throughput / prefill (**projected, unmeasured**) |
+| `vllm-fp16-tp4` | vLLM FP16 | TP4 | Original topology-agnostic FP16 baseline (**projected, unmeasured**) |
 
 ### Fastest single request (default)
 
@@ -58,13 +59,37 @@ quantization (GGUF `Q4_K_M`/`Q8_0`) that ships an sm_75 kernel. See the
 ./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
 ```
 
+The server listens on **port 8090** (`SERVER_PORT` in `target.env`) because port
+8000 on this host is already bound by an unrelated Docker service. All wrappers
+resolve this automatically.
+
 The default uses the [Unsloth GGUF distribution](https://huggingface.co/unsloth/Qwen3-Coder-Next-GGUF)
 `Qwen3-Coder-Next-Q4_K_M.gguf` (imatrix-quantized, **45.20 GiB, single file** —
-no `gguf-split` merge needed). It is the strongest candidate for the lowest
-single-request latency and fastest decode on sm_75. Qwen3-Next / DeltaNet
-support landed upstream in llama.cpp around release `b7186`; the reused DeepSeek
-build is `b10298`, which is newer, but must still pass a real
-load-and-generate test before results are trusted.
+no `gguf-split` merge needed). Qwen3-Next / DeltaNet support landed upstream in
+llama.cpp around release `b7186`; the reused DeepSeek build is `b10298`, which is
+newer. As of **2026-08-07 this build passed a real load-and-generate test** — it
+runs `qwen3_next` on sm_75 and the numbers are now in
+[PERFORMANCE.md](PERFORMANCE.md).
+
+The 4-GPU layer split is the **measured** best choice for long coding-agent
+prompts (2820 tok/s at 4096-token prefill, 34.4% faster than a 2-GPU split) with
+88.5 tok/s decode. If your workload is decode-bound (short prompts, long
+generations), the `llama-cpp-q4km-2gpu` profile pins the model to the NVLink pair
+0-1 and decodes at **100.4 tok/s (+13.5%)**, trading away long-prefill
+throughput:
+
+```bash
+./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km-2gpu
+```
+
+That profile drives GPU visibility through `CUDA_VISIBLE_DEVICES=0,1` with a
+matching `TENSOR_SPLIT=1,1`. Because profile env files load last in
+`scripts/lib/common.sh`, the override is scoped to that profile and does not
+affect the 4-GPU default or any other target.
+
+**Row split is a measured incompatibility on this build.** `SPLIT_MODE=row`
+failed to load the model on both 4 and 2 GPUs (2026-08-07, `b10298`/sm_75), so
+the profiles keep `SPLIT_MODE=layer` and row mode is not recommended.
 
 #### GGUF distribution and quant selection
 
@@ -108,10 +133,11 @@ All four operations reuse the generic repository scripts; there are no
 target-specific wrappers. Each resolves the profile through
 `scripts/lib/common.sh` (hardware profile -> `target.env` -> profile).
 
-Serve (launches the correct backend with the profile's settings):
+Serve (launches the correct backend with the profile's settings, on port 8090):
 
 ```bash
-./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km      # llama.cpp
+./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km      # llama.cpp, 4-GPU (default)
+./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km-2gpu # llama.cpp, 2-GPU (fastest decode)
 ./scripts/serve-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2    # vLLM TP2xPP2
 ```
 
@@ -131,14 +157,21 @@ Use a long prompt with `--max-tokens 1` to make it a stable prefill-oriented
 comparison; use backend-native metrics when an exact kernel-only prefill rate is
 required.
 
-Point coding agents at the local endpoint:
+Point coding agents at the local endpoint (served on port 8090):
 
 ```bash
+# Launch the server first (4-GPU default), then the Copilot wrapper:
+./scripts/serve-model.sh   qwen3-coder-next-80b-a3b llama-cpp-q4km
 # GitHub Copilot CLI -> local OpenAI-compatible endpoint (works with either backend)
 ./scripts/copilot-local.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
 # Claude Code -> local Anthropic-compatible endpoint (llama.cpp only)
-./scripts/claude-local.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
+./scripts/claude-local.sh  qwen3-coder-next-80b-a3b llama-cpp-q4km
 ```
+
+The Copilot wrapper health-checks `http://127.0.0.1:8090/health` and derives the
+provider base URL from `SERVER_PORT`, so
+`./scripts/copilot-local.sh qwen3-coder-next-80b-a3b llama-cpp-q4km` works with
+no manual port override once the server is up.
 
 `claude-local.sh` requires a llama.cpp profile because vLLM does not serve the
 Anthropic API; use it with `llama-cpp-q4km` (the target default). `copilot-local.sh`
@@ -206,39 +239,49 @@ timestamps, message ordering, or chat template invalidates the cached prefix.
 It is **not a security boundary** — run a single trusted user/server (or use
 per-tenant salts if the client/API supports them).
 
-llama.cpp (`llama-cpp-q4km`, port 8000 — server logs report slot reuse):
+llama.cpp (`llama-cpp-q4km`, port 8090 — server logs report slot reuse):
 
 ```bash
 # Prometheus counters (requires ENABLE_METRICS=1)
-curl -s http://127.0.0.1:8000/metrics | grep -iE 'prompt|kv|cache'
+curl -s http://127.0.0.1:8090/metrics | grep -iE 'prompt|kv|cache'
 # Per-request timings: send the same long prompt twice; on the 2nd call the
 # server-reported prompt-eval time drops sharply and the log shows a slot reuse
 # line ("slot ... reuse ... n_past").
-curl -s http://127.0.0.1:8000/v1/chat/completions -H 'Content-Type: application/json' \
+curl -s http://127.0.0.1:8090/v1/chat/completions -H 'Content-Type: application/json' \
   -d '{"model":"qwen3-coder-next","messages":[{"role":"user","content":"<long stable prompt>"}],"max_tokens":1}' | jq '.timings // .usage'
 ```
 
-vLLM (`vllm-fp16-*`, port 8000 — APC exposes hit-rate gauges):
+vLLM (`vllm-fp16-*`, port 8090 — APC exposes hit-rate gauges):
 
 ```bash
 # Exact metric names vary by vLLM version; grep for the prefix-cache series and
 # watch the hit counter rise on the second identical request.
-curl -s http://127.0.0.1:8000/metrics | grep -iE 'prefix_cache'
+curl -s http://127.0.0.1:8090/metrics | grep -iE 'prefix_cache'
 ```
 
-Honest limitations: these are **projected/operational** guidance, not measured
-RTX 8000 results (see PERFORMANCE.md). The `qwen3_next` load-and-generate test,
-the experimental `align` Mamba cache mode, and the exact vLLM metric names on
-this host must all be confirmed on a real run before the numbers are trusted.
+Measured 2026-08-07 (llama.cpp `llama-cpp-q4km`): a repeated 7590-token prompt
+dropped from 6.727 s cold to ~3.26 s warm, with only 4 prompt tokens
+re-evaluated on the warm turns and the log reporting `LCP similarity 1.000`,
+`f_keep=0.967`, 7586 tokens reused (99.95%). Note `/metrics` exposed aggregate
+timing/token counters but **no explicit cache-hit counter**, so reuse is
+confirmed from the per-request prompt-eval collapse and the server log rather
+than a dedicated gauge. The vLLM `align` Mamba cache mode and its exact metric
+names remain **unmeasured** on this host (BF16 download incomplete).
 
 ## Status and blockers
 
+- **llama.cpp `Q4_K_M` is measured and working.** As of 2026-08-07 the `b10298`
+  / sm_75 build loads and generates `qwen3_next`; native and server throughput,
+  cold/warm prefix-cache behavior, GPU utilization, and the row-split failure are
+  recorded in [PERFORMANCE.md](PERFORMANCE.md).
+- **The Qwen server default port is 8090, not 8000** (`SERVER_PORT` in
+  `target.env`), because port 8000 on this host is bound by an unrelated Docker
+  service. All wrappers resolve this automatically.
 - **Local BF16 download is incomplete.** Shards `00003` and `00039` of 40 are
   missing from `/home/algore/models/qwen3-coder-next-80b-a3b`, so the vLLM
   profiles cannot load until the download is completed
-  (`./scripts/download-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp4`).
-- The `llama-cpp-q4km` profile fetches a single-file GGUF into a **separate**
-  directory (`…-gguf/Qwen3-Coder-Next-Q4_K_M.gguf`) and does not depend on those
-  safetensors shards.
-- All performance numbers in [PERFORMANCE.md](PERFORMANCE.md) are **projected
-  planning targets**, not measured RTX 8000 results.
+  (`./scripts/download-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp4`). Every
+  vLLM FP16 number in PERFORMANCE.md therefore remains a **projection**.
+- The `llama-cpp-q4km` / `llama-cpp-q4km-2gpu` profiles fetch a single-file GGUF
+  into a **separate** directory (`…-gguf/Qwen3-Coder-Next-Q4_K_M.gguf`) and do
+  not depend on those safetensors shards.

@@ -15,7 +15,7 @@ tuning profile rather than around one model.
 | Target | Backend | Status |
 |---|---|---|
 | [DeepSeek V4 Flash 0731](targets/deepseek-v4-flash-0731/) | llama.cpp + DSpark | Optimized and measured |
-| [Qwen3-Coder-Next 80B-A3B](targets/qwen3-coder-next-80b-a3b/) | llama.cpp Q4_K_M (default) / vLLM FP16 | Architecture defined, targets projected, not yet measured |
+| [Qwen3-Coder-Next 80B-A3B](targets/qwen3-coder-next-80b-a3b/) | llama.cpp Q4_K_M (default) / vLLM FP16 | llama.cpp Q4_K_M measured; vLLM FP16 projected |
 
 ## Layout
 

@@ -15,7 +15,7 @@ tuning profile rather than around one model.
 | Target | Backend | Status |
 |---|---|---|
 | [DeepSeek V4 Flash 0731](targets/deepseek-v4-flash-0731/) | llama.cpp + DSpark | Optimized and measured |
-| [Qwen3-Coder-Next 80B-A3B](targets/qwen3-coder-next-80b-a3b/) | llama.cpp Q4_K_M (default) / vLLM FP16 | llama.cpp Q4_K_M measured; vLLM FP16 projected |
+| [Qwen3-Coder-Next 80B-A3B](targets/qwen3-coder-next-80b-a3b/) | llama.cpp Q4_K_M 2-GPU (default) / vLLM FP16 | llama.cpp Q4_K_M measured; vLLM FP16 projected |
 
 ## Layout
 
@@ -36,10 +36,17 @@ DeepSeek balanced profile:
 ./scripts/serve-model.sh deepseek-v4-flash-0731 q4-balanced
 ```
 
-Qwen fastest single-request profile (llama.cpp `Q4_K_M`, the default):
+Qwen fastest single-request decode (llama.cpp `Q4_K_M`, 2-GPU NVLink pair — the
+default):
 
 ```bash
-./scripts/download-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
+./scripts/download-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km-2gpu
+./scripts/serve-model.sh qwen3-coder-next-80b-a3b            # default = llama-cpp-q4km-2gpu (GPUs 0,1)
+```
+
+Qwen explicit 4-GPU long-prefill throughput profile (llama.cpp `Q4_K_M`):
+
+```bash
 ./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
 ```
 
@@ -53,7 +60,7 @@ Qwen highest-throughput profile (vLLM FP16, NVLink-pair-aware `TP2 x PP2`):
 Benchmark a running target (single-request latency, or aggregate throughput):
 
 ```bash
-./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
+./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b
 ./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km -- --prompt-file PROMPT.txt --max-tokens 1
 ./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2 -- --concurrency 16 --requests 64
 ```
@@ -62,11 +69,12 @@ The prompt-rate fields are end-to-end API rates. With `--max-tokens 1` and a
 long prompt they are useful prefill-oriented comparisons, but they are not
 server-internal kernel timings.
 
-Point coding agents at the local server:
+Point coding agents at the local server (both wrappers default to the Qwen
+target and its 2-GPU default profile on port 8090):
 
 ```bash
-./scripts/copilot-local.sh qwen3-coder-next-80b-a3b llama-cpp-q4km   # OpenAI /v1 (either backend)
-./scripts/claude-local.sh  qwen3-coder-next-80b-a3b llama-cpp-q4km   # Anthropic API (llama.cpp)
+./scripts/copilot-local.sh   # OpenAI /v1, Qwen default (either backend)
+./scripts/claude-local.sh    # Anthropic API, Qwen default (llama.cpp)
 ```
 
 Inspect status:

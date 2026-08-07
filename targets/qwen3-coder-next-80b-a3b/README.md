@@ -46,17 +46,17 @@ quantization (GGUF `Q4_K_M`/`Q8_0`) that ships an sm_75 kernel. See the
 
 | Profile | Backend | Parallelism | Purpose |
 |---|---|---|---|
-| `llama-cpp-q4km` (default) | llama.cpp | layer split x4 | **Measured** best for long coding-agent prompts (fastest 4096-token prefill: 2820 tok/s); decode 88.5 tok/s |
-| `llama-cpp-q4km-2gpu` | llama.cpp | layer split x2 (NVLink pair 0-1) | **Measured** fastest single-request decode: 100.4 tok/s (+13.5% vs 4-GPU), at lower long-prefill throughput |
+| `llama-cpp-q4km-2gpu` (default) | llama.cpp | layer split x2 (NVLink pair 0-1) | **Measured** fastest single-request decode: 100.4 tok/s (+13.5% vs 4-GPU); the interactive default |
+| `llama-cpp-q4km` | llama.cpp | layer split x4 | **Measured** best for long coding-agent prompts (fastest 4096-token prefill: 2820 tok/s); decode 88.5 tok/s |
 | `vllm-fp16-tp2pp2` | vLLM FP16 | TP2 x PP2 (NVLink-pair aware) | Highest aggregate serving throughput / prefill (**projected, unmeasured**) |
 | `vllm-fp16-tp4` | vLLM FP16 | TP4 | Original topology-agnostic FP16 baseline (**projected, unmeasured**) |
 
 ### Fastest single request (default)
 
 ```bash
-./scripts/download-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
+./scripts/download-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km-2gpu
 ./scripts/build-llama-cpp.sh            # sm_75 build; needs llama.cpp >= b7186 for qwen3_next
-./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
+./scripts/serve-model.sh qwen3-coder-next-80b-a3b   # default profile = llama-cpp-q4km-2gpu
 ```
 
 The server listens on **port 8090** (`SERVER_PORT` in `target.env`) because port
@@ -71,21 +71,31 @@ newer. As of **2026-08-07 this build passed a real load-and-generate test** — 
 runs `qwen3_next` on sm_75 and the numbers are now in
 [PERFORMANCE.md](PERFORMANCE.md).
 
-The 4-GPU layer split is the **measured** best choice for long coding-agent
-prompts (2820 tok/s at 4096-token prefill, 34.4% faster than a 2-GPU split) with
-88.5 tok/s decode. If your workload is decode-bound (short prompts, long
-generations), the `llama-cpp-q4km-2gpu` profile pins the model to the NVLink pair
-0-1 and decodes at **100.4 tok/s (+13.5%)**, trading away long-prefill
-throughput:
+The **default is now the 2-GPU NVLink-pair layer split** (`llama-cpp-q4km-2gpu`),
+which pins the model to GPUs 0-1 and decodes at **100.4 tok/s (+13.5%** vs
+4-GPU). Interactive coding turns are decode-bound once the stable system prompt
+is prefix-cached, so this is the fastest interactive choice. A controlled 2-GPU
+tuning sweep (2026-08-07) confirmed this plain layer split is also the fastest
+**safe** configuration: `-sm tensor` (−13% decode), `CUDA_SCALE_LAUNCH_QUEUES=4x`
+(within noise but slower, so explicitly unset), `UBATCH_SIZE` other than 2048
+(slower, and 4096 fails to allocate),
+`THREADS`/`POLL` (noise), and `GGML_CUDA_P2P=1` (no gain, corruption risk) were
+all rejected — see the [tuning sweep table](PERFORMANCE.md#2-gpu-01-tuning-sweep--selecting-the-default-2026-08-07-pm).
+
+If your workload is instead **long-prompt / prefill-dominated**, select the
+explicit 4-GPU `llama-cpp-q4km` profile, which reaches **2820 tok/s at
+4096-token prefill (+34.4%** vs 2-GPU) with 88.5 tok/s decode:
 
 ```bash
-./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km-2gpu
+./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
 ```
 
-That profile drives GPU visibility through `CUDA_VISIBLE_DEVICES=0,1` with a
-matching `TENSOR_SPLIT=1,1`. Because profile env files load last in
-`scripts/lib/common.sh`, the override is scoped to that profile and does not
-affect the 4-GPU default or any other target.
+The default 2-GPU profile drives GPU visibility through
+`CUDA_VISIBLE_DEVICES=0,1` with a matching `TENSOR_SPLIT=1,1`. Because profile
+env files load last in `scripts/lib/common.sh`, the override is scoped to that
+profile and does not affect the 4-GPU profile or any other target. The llama.cpp
+backend now also fails fast if a profile's `TENSOR_SPLIT` entry count does not
+match `CUDA_VISIBLE_DEVICES`.
 
 **Row split is a measured incompatibility on this build.** `SPLIT_MODE=row`
 failed to load the model on both 4 and 2 GPUs (2026-08-07, `b10298`/sm_75), so
@@ -136,17 +146,17 @@ target-specific wrappers. Each resolves the profile through
 Serve (launches the correct backend with the profile's settings, on port 8090):
 
 ```bash
-./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km      # llama.cpp, 4-GPU (default)
-./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km-2gpu # llama.cpp, 2-GPU (fastest decode)
+./scripts/serve-model.sh qwen3-coder-next-80b-a3b                     # llama.cpp, 2-GPU (default, fastest decode)
+./scripts/serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km      # llama.cpp, 4-GPU (long-prefill throughput)
 ./scripts/serve-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2    # vLLM TP2xPP2
 ```
 
 Benchmark (OpenAI `/v1/chat/completions`, served by both backends):
 
 ```bash
-# Single-request decode latency (latency-oriented profile)
-./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
-# Prefill-oriented comparison: long prompt, one generated token
+# Single-request decode latency (default 2-GPU profile)
+./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b
+# Prefill-oriented comparison: long prompt, one generated token (explicit 4-GPU)
 ./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km -- --prompt-file PROMPT.txt --max-tokens 1
 # Aggregate throughput under concurrency (throughput-oriented profile)
 ./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2 -- --concurrency 16 --requests 64
@@ -160,23 +170,26 @@ required.
 Point coding agents at the local endpoint (served on port 8090):
 
 ```bash
-# Launch the server first (4-GPU default), then the Copilot wrapper:
-./scripts/serve-model.sh   qwen3-coder-next-80b-a3b llama-cpp-q4km
-# GitHub Copilot CLI -> local OpenAI-compatible endpoint (works with either backend)
-./scripts/copilot-local.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
-# Claude Code -> local Anthropic-compatible endpoint (llama.cpp only)
-./scripts/claude-local.sh  qwen3-coder-next-80b-a3b llama-cpp-q4km
+# Launch the server first (2-GPU default), then the Copilot wrapper:
+./scripts/serve-model.sh   qwen3-coder-next-80b-a3b
+# GitHub Copilot CLI -> local OpenAI-compatible endpoint (Qwen is the wrapper default)
+./scripts/copilot-local.sh
+# Claude Code -> local Anthropic-compatible endpoint (llama.cpp only; Qwen default)
+./scripts/claude-local.sh
 ```
 
-The Copilot wrapper health-checks `http://127.0.0.1:8090/health` and derives the
-provider base URL from `SERVER_PORT`, so
-`./scripts/copilot-local.sh qwen3-coder-next-80b-a3b llama-cpp-q4km` works with
-no manual port override once the server is up.
+Both wrappers default to the `qwen3-coder-next-80b-a3b` target and its default
+profile (`llama-cpp-q4km-2gpu`, port 8090); an explicit target/profile still
+works (e.g. `./scripts/copilot-local.sh deepseek-v4-flash-0731 q4-balanced`). The
+Copilot wrapper health-checks `http://127.0.0.1:8090/health` and derives the
+provider base URL from `SERVER_PORT`, so it works with no manual port override
+once the server is up.
 
 `claude-local.sh` requires a llama.cpp profile because vLLM does not serve the
-Anthropic API; use it with `llama-cpp-q4km` (the target default). `copilot-local.sh`
-uses the OpenAI-compatible `/v1` endpoint and therefore works with either
-backend. Both wrappers health-check the server first and export the correct
+Anthropic API; the Qwen default (`llama-cpp-q4km-2gpu`) is llama.cpp, so the
+no-argument invocation is valid. `copilot-local.sh` uses the OpenAI-compatible
+`/v1` endpoint and therefore works with either backend. Both wrappers
+health-check the server first and export the correct
 model alias (`qwen3-coder-next`) and base URL.
 
 ## Prompt / prefix caching
@@ -189,9 +202,10 @@ stock defaults because the knobs are only applied when a profile sets them.
 
 ### What is enabled
 
-**llama.cpp (`llama-cpp-q4km`)** — the `b10298` server already defaults to
-`--cache-prompt` on, `--cache-ram 8192`, and `--cache-idle-slots` on. The
-profile makes caching explicit and tunes it for a single interactive session:
+**llama.cpp (`llama-cpp-q4km-2gpu` default and `llama-cpp-q4km`)** — the `b10298`
+server already defaults to `--cache-prompt` on, `--cache-ram 8192`, and
+`--cache-idle-slots` on. Both llama.cpp profiles carry identical caching knobs
+and make caching explicit, tuned for a single interactive session:
 
 | Env var | Flag | Value | Why |
 |---|---|---|---|

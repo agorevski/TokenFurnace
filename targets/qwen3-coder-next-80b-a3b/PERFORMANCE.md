@@ -70,13 +70,83 @@ build.
   0-1 instead of crossing the PCIe host bridge.
 - **512-token prefill is essentially tied** — the 2-GPU split is only 0.6%
   faster (1256.25 vs 1249.03 tok/s), within noise.
-- **Conclusion:** the current 4-GPU `llama-cpp-q4km` default is the right
-  choice for long coding-agent prompts (prefill-dominated). A 2-GPU layer
-  profile is worthwhile when the fastest decode matters, and is added as the
-  explicit `llama-cpp-q4km-2gpu` profile (see the target README). That profile
-  drives GPU visibility through `CUDA_VISIBLE_DEVICES=0,1` and a matching
+- **Conclusion:** the 2-GPU NVLink pair (`llama-cpp-q4km-2gpu`) is the fastest
+  single-request DECODE and is now the **target default**, because interactive
+  coding turns are decode-bound once the stable system prompt is prefix-cached.
+  The 4-GPU `llama-cpp-q4km` layer split remains the right **explicit** choice
+  for long, prefill-dominated prompts (+34.4% at 4096-token prefill). The 2-GPU
+  profile drives GPU visibility through `CUDA_VISIBLE_DEVICES=0,1` and a matching
   `TENSOR_SPLIT=1,1`; because profile env files load last, the override is
-  scoped to that profile only.
+  scoped to that profile only. The [tuning sweep below](#2-gpu-01-tuning-sweep--selecting-the-default-2026-08-07-pm)
+  confirms none of the experimental knobs beats this plain layer split.
+
+### 2-GPU (0,1) tuning sweep — selecting the default (2026-08-07 PM)
+
+After the 2-GPU layer split was chosen as the fastest-decode configuration, a
+controlled `llama-bench` sweep (`-r 5`, same b10298/sm_75 build, GPUs 0,1,
+`-sm layer -ts 1,1 -b 8192`) tested every plausible safe knob to confirm nothing
+faster or safer exists before promoting it to the **target default**. The plain
+layer split with `UBATCH_SIZE=2048` won; **every experimental knob was neutral or
+harmful and is not adopted.**
+
+> **Thermal caveat for this session.** Under sustained back-to-back runs GPU 0
+> reached 87-88 °C and the driver applied SW thermal slowdown (throttle reason
+> `0x20`), dropping its SM clock from 1905 to ~1395 MHz. Absolute figures below
+> therefore run **~15-20% under** the cooler-silicon `pp4096 = 2098` recorded in
+> the table above, and this custom build's `llama-bench` runs each test set twice
+> (the second pass is hotter/slower). Values quoted are the **first (coolest)
+> pass**; comparisons are only made **within the same thermal window**, which is
+> what determines the knob decisions.
+
+| Experiment (vs plain layer, ub2048) | 512 prefill | 4096 prefill | 8192 prefill | 128 decode | Decision |
+|---|---:|---:|---:|---:|---|
+| **Plain layer split, `ub2048` (selected)** | **1242.85 ± 17.42** | **1705.48 ± 42.91** | **1529.17 ± 13.37** | **92.72 ± 0.42** | **Adopted as default** |
+| `CUDA_SCALE_LAUNCH_QUEUES=4x` | 1229.08 ± 17.52 | 1657.90 ± 50.80 | — | 91.23 ± 0.62 | Reject — within noise of unset |
+| `-sm tensor` (2-GPU tensor split) | 1211.95 ± 16.10 | 1617.31 ± 44.23 | 1481.17 ± 13.83 | 80.58 ± 0.44 | Reject — decode −13%, prefill no better |
+| `UBATCH_SIZE=512` | 1227.55 ± 18.24 | 1107.17 ± 36.97 | — | 89.90 ± 0.65 | Reject — long prefill much slower |
+| `UBATCH_SIZE=1024` | 1072.31 ± 7.42 | 1328.60 ± 3.08 | — | 88.78 ± 0.79 | Reject — long prefill slower |
+| `UBATCH_SIZE=4096` | — | — | — | — | **Fails** — cannot create compute context |
+| `THREADS=8, POLL=50` | — | — | — | 97.08 ± 0.77 | Noise — confounded by test ordering/thermals |
+| `THREADS=18, POLL=50` | — | — | — | 92.80 ± 0.21 | Noise — decode is GPU-bandwidth-bound |
+| `THREADS=8/18, POLL=100` | — | — | — | 88.88–91.35 | Noise — no reproducible win |
+| `GGML_CUDA_P2P=1` | — | 1703.57 ± 52.16 | — | 91.96 ± 0.43 | Reject — no gain; upstream warns of corruption/crashes |
+
+Native `llama-bench` command pattern for the sweep (values vary per row):
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 llama-bench \
+  -m /home/algore/models/qwen3-coder-next-80b-a3b-gguf/Qwen3-Coder-Next-Q4_K_M.gguf \
+  -ngl 99 -sm layer -ts 1,1 -fa on -b 8192 -ub 2048 -r 5 \
+  -p 512 -p 4096 -p 8192 -n 128
+# knob overrides tested: CUDA_SCALE_LAUNCH_QUEUES=4x (env) | -sm tensor |
+#   -ub 512 / 1024 / 4096 | -t 8/-t 18 --poll 50/100 | GGML_CUDA_P2P=1 (env)
+```
+
+**Decisions applied to the profiles/backend.**
+
+- **`UBATCH_SIZE=2048` kept.** Long-prefill throughput rises with ubatch
+  (`pp4096` 1107 → 1329 → 1540 across 512/1024/2048) but **4096 fails to create
+  the compute context** on 2 GPUs, so 2048 is the optimal working value —
+  matching the value the profile already used.
+- **`-sm tensor` rejected.** It loads on 2 GPUs (F16 KV + FA + NCCL), but the
+  per-layer all-reduce over the 2-link NVLink bond on Turing costs **−13% decode
+  (80.6 vs 92.7 tok/s)** with no prefill benefit, so it is not adopted and text
+  correctness was not pursued further.
+- **`CUDA_SCALE_LAUNCH_QUEUES` explicitly unset for the 2-GPU profile.** `4x`
+  was within noise but slower in both measured rows, so the profile restores
+  CUDA's stock behavior while the backend preserves DeepSeek's measured `4x`
+  default.
+- **`THREADS`/`POLL` left at server defaults.** Decode is GPU-bandwidth-bound
+  (~3B active params, all resident in VRAM); the apparent `t8 > t18` gap tracks
+  test ordering and GPU temperature, not a real dispatch win, so no knob is set.
+- **`GGML_CUDA_P2P=1` left unset.** No measured gain and upstream warns of
+  corruption/crashes, so it is not enabled by default.
+- **F16 KV kept.** Q4_K_M already leaves large VRAM headroom; no long-context Q8
+  test justified lowering KV quality for unused VRAM.
+
+The winning configuration is exactly the plain 2-GPU layer split the
+`llama-cpp-q4km-2gpu` profile already encoded, which is now
+`DEFAULT_PROFILE` for the Qwen target.
 
 ### Actual 4-GPU server run (cold vs warm, prefix caching)
 
@@ -145,9 +215,9 @@ and different metrics, so both are reproduced, each in its own row.
 ## Single-stream latency (1 request, lowest latency)
 
 Goal: fastest tokens/sec for one interactive coding-agent session. This is what
-`llama-cpp-q4km` (4-GPU) and `llama-cpp-q4km-2gpu` target. The llama.cpp rows
-are now **confirmed by measurement** (see [Measured results](#measured-results));
-the vLLM row stays PROJECTED.
+`llama-cpp-q4km-2gpu` (2-GPU, the **default**) and the explicit `llama-cpp-q4km`
+(4-GPU) target. The llama.cpp rows are now **confirmed by measurement** (see
+[Measured results](#measured-results)); the vLLM row stays PROJECTED.
 
 | Runtime / quant | Metric | Projected realistic | Projected stretch | Measured 2026-08-07 | Notes |
 |---|---|---:|---:|---:|---|
@@ -188,10 +258,13 @@ by any single request and must never be quoted as a per-user speed.
    split is the default and loads reliably. Row split was **measured to fail to
    load** this model on both 4 and 2 GPUs (2026-08-07, `b10298`/sm_75); it also
    failed to load DeepSeek-V4. Do not use `SPLIT_MODE=row` here. For fastest
-   single-request decode, restrict to the NVLink pair 0-1 via the
-   `llama-cpp-q4km-2gpu` profile (measured +13.5% decode over 4-GPU); keep the
-   4-GPU default for long-prompt prefill (measured +34.4% at 4096-token
-   prefill).
+   single-request decode — the **default** — restrict to the NVLink pair 0-1 via
+   the `llama-cpp-q4km-2gpu` profile (measured +13.5% decode over 4-GPU); select
+   the explicit 4-GPU `llama-cpp-q4km` profile for long-prompt prefill (measured
+   +34.4% at 4096-token prefill). A 2-GPU tuning sweep (2026-08-07) confirmed
+   `-sm tensor`, `CUDA_SCALE_LAUNCH_QUEUES=4x`, `UBATCH_SIZE!=2048`,
+   `THREADS`/`POLL`, and `GGML_CUDA_P2P=1` are all neutral or harmful and are not
+   adopted.
 4. **Extend KV headroom cheaply.** `Q4_K_M` leaves large VRAM headroom; try
    `CACHE_TYPE_K=q8_0 CACHE_TYPE_V=q8_0` to grow usable context toward the
    262,144 native limit. Verify correctness first.

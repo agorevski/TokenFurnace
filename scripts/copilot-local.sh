@@ -5,10 +5,23 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
 
-target=${1:-deepseek-v4-flash-0731}
-profile=${2:-}
-if (($#)); then shift; fi
-if (($#)); then shift; fi
+# Default to the primary target (Qwen3-Coder-Next). Its default profile is the
+# 2-GPU llama.cpp Q4_K_M server on port 8090; explicit DeepSeek still works, e.g.
+#   ./scripts/copilot-local.sh deepseek-v4-flash-0731 q4-balanced
+# A leading-'-' first/second argument (e.g. --help) is NOT treated as a
+# target/profile: it is passed straight through to the copilot CLI, so
+#   ./scripts/copilot-local.sh qwen3-coder-next-80b-a3b --help
+# resolves the Qwen default profile and forwards --help to the CLI.
+target=qwen3-coder-next-80b-a3b
+profile=
+if (($#)) && [[ "$1" != -* ]]; then
+  target=$1
+  shift
+  if (($#)) && [[ "$1" != -* ]]; then
+    profile=$1
+    shift
+  fi
+fi
 load_target "$target" "$profile"
 
 require_command curl

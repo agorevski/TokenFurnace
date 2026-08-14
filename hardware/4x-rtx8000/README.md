@@ -112,6 +112,11 @@ CUDA extension compatibility than the base Python 3.13 environment.
    SGLang/ExLlama as unproven on `sm_75` until a load test passes.
 7. Do not assume FP8 or Blackwell/Hopper benchmark results transfer to Turing.
 
+For the dense Qwen3.8-27B target, measured tensor parallelism on one NVLink pair
+is an exception to the usual single-GPU GGUF latency preference: it improves
+native decode by 43.7% and 4096-token prefill by 68.8% over one GPU. Use the
+target's measured default rather than applying sparse-model guidance to it.
+
 ## Operational checks
 
 ```bash

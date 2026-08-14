@@ -133,5 +133,15 @@ if [[ "${DSPARK:-0}" != 0 ]]; then
   )
 fi
 
+if [[ -n "${SPEC_TYPE:-}" ]]; then
+  args+=(--spec-type "$SPEC_TYPE")
+  if [[ -n "${SPEC_DRAFT_N_MAX:-}" ]]; then
+    args+=(--spec-draft-n-max "$SPEC_DRAFT_N_MAX")
+  fi
+  if [[ -n "${SPEC_DRAFT_P_MIN:-}" ]]; then
+    args+=(--spec-draft-p-min "$SPEC_DRAFT_P_MIN")
+  fi
+fi
+
 mkdir -p "$MODEL_DIR/slot-cache"
 exec "$server" "${args[@]}" "$@"

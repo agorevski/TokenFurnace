@@ -13,6 +13,8 @@ Examples:
   serve-model.sh deepseek-v4-flash-0731 q4-balanced
   serve-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
   serve-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2
+  serve-model.sh qwen3.6-35b-a3b llama-cpp-q4km-mtp-1gpu
+  serve-model.sh qwen3.8-27b llama-cpp-q4km-1gpu
 EOF
 }
 
@@ -21,9 +23,12 @@ case "${1:-}" in
 esac
 
 target=$1
-profile=${2:-}
 shift
-[[ -z "$profile" ]] || shift
+profile=
+if (($#)) && [[ "$1" != -- && "$1" != -* ]]; then
+  profile=$1
+  shift
+fi
 [[ "${1:-}" != -- ]] || shift
 
 load_target "$target" "$profile"

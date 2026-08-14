@@ -16,6 +16,8 @@ tuning profile rather than around one model.
 |---|---|---|
 | [DeepSeek V4 Flash 0731](targets/deepseek-v4-flash-0731/) | llama.cpp + DSpark | Optimized and measured |
 | [Qwen3-Coder-Next 80B-A3B](targets/qwen3-coder-next-80b-a3b/) | llama.cpp Q4_K_M 2-GPU (default) / vLLM FP16 | llama.cpp Q4_K_M measured; vLLM FP16 projected |
+| [Qwen3.6-35B-A3B](targets/qwen3.6-35b-a3b/) | llama.cpp Q4_K_M + MTP (default) / vLLM FP16 | llama.cpp measured; vLLM pending |
+| [Qwen3.8-27B](targets/qwen3.8-27b/) | llama.cpp Q4_K_M, 2-GPU tensor split | Optimized and measured |
 
 ## Layout
 
@@ -26,6 +28,7 @@ scripts/backends/         Runtime-specific launch implementations
 scripts/serve-model.sh    Generic target/profile launcher
 scripts/download-model.sh Generic Hugging Face downloader
 scripts/benchmark-model.sh OpenAI-compatible API benchmark
+scripts/benchmark-native.sh llama.cpp prefill/decode kernel benchmark
 ```
 
 ## Usage
@@ -57,12 +60,33 @@ Qwen highest-throughput profile (vLLM FP16, NVLink-pair-aware `TP2 x PP2`):
 ./scripts/serve-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2
 ```
 
+Qwen3.6 fastest interactive profile (single GPU, Q4_K_M, MTP):
+
+```bash
+./scripts/download-model.sh qwen3.6-35b-a3b
+./scripts/serve-model.sh qwen3.6-35b-a3b
+```
+
+Qwen3.8 fastest profile (2-GPU NVLink tensor split, Unsloth Q4_K_M):
+
+```bash
+./scripts/download-model.sh qwen3.8-27b
+./scripts/benchmark-native.sh qwen3.8-27b
+./scripts/serve-model.sh qwen3.8-27b
+```
+
 Benchmark a running target (single-request latency, or aggregate throughput):
 
 ```bash
 ./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b
 ./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km -- --prompt-file PROMPT.txt --max-tokens 1
 ./scripts/benchmark-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2 -- --concurrency 16 --requests 64
+```
+
+Run the standard native llama.cpp sweep without starting a server:
+
+```bash
+./scripts/benchmark-native.sh qwen3.6-35b-a3b llama-cpp-q4km-1gpu
 ```
 
 The prompt-rate fields are end-to-end API rates. With `--max-tokens 1` and a

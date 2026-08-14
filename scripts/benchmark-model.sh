@@ -17,15 +17,20 @@ Examples:
   benchmark-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km -- --prompt-file PROMPT.txt --max-tokens 1
   # Aggregate serving throughput under concurrency
   benchmark-model.sh qwen3-coder-next-80b-a3b vllm-fp16-tp2pp2 -- --concurrency 16 --requests 64
+  # Qwen3.8 single-GPU API throughput
+  benchmark-model.sh qwen3.8-27b llama-cpp-q4km-1gpu -- --max-tokens 512
 USAGE
     exit 0
     ;;
 esac
 
 target=$1
-profile=${2:-}
 shift
-[[ -z "$profile" ]] || shift
+profile=
+if (($#)) && [[ "$1" != -- && "$1" != -* ]]; then
+  profile=$1
+  shift
+fi
 [[ "${1:-}" != -- ]] || shift
 load_target "$target" "$profile"
 

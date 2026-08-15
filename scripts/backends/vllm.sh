@@ -46,7 +46,7 @@ if [[ -n "${BLOCK_SIZE:-}" ]]; then
   args+=(--block-size "$BLOCK_SIZE")
 fi
 if [[ -n "${ATTENTION_BACKEND:-}" ]]; then
-  export VLLM_ATTENTION_BACKEND="$ATTENTION_BACKEND"
+  args+=(--attention-backend "$ATTENTION_BACKEND")
 fi
 if [[ "${ENABLE_AUTO_TOOL_CHOICE:-0}" != 0 ]]; then
   args+=(--enable-auto-tool-choice --tool-call-parser "$TOOL_CALL_PARSER")

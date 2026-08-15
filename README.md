@@ -17,7 +17,7 @@ tuning profile rather than around one model.
 | [DeepSeek V4 Flash 0731](targets/deepseek-v4-flash-0731/) | llama.cpp + DSpark | Optimized and measured |
 | [Qwen3-Coder-Next 80B-A3B](targets/qwen3-coder-next-80b-a3b/) | llama.cpp Q4_K_M 2-GPU (default) / vLLM FP16 | llama.cpp Q4_K_M measured; vLLM FP16 projected |
 | [Qwen3.6-35B-A3B](targets/qwen3.6-35b-a3b/) | llama.cpp Q4_K_M + MTP (default) / vLLM FP16 | llama.cpp measured; vLLM pending |
-| [Qwen3.8-27B](targets/qwen3.8-27b/) | llama.cpp Q4_K_M, 2-GPU tensor split | Optimized and measured |
+| [Qwen3.8-27B](targets/qwen3.8-27b/) | llama.cpp Q4_K_M / official FP16 vLLM TP2 + MTP | Optimized and measured |
 
 ## Layout
 
@@ -73,6 +73,14 @@ Qwen3.8 fastest profile (2-GPU NVLink tensor split, Unsloth Q4_K_M):
 ./scripts/download-model.sh qwen3.8-27b
 ./scripts/benchmark-native.sh qwen3.8-27b
 ./scripts/serve-model.sh qwen3.8-27b
+```
+
+Qwen3.8 official unquantized checkpoint (official BF16 safetensors cast to
+native Turing FP16 on load):
+
+```bash
+./scripts/download-model.sh qwen3.8-27b vllm-official-fp16-tp2
+./scripts/serve-model.sh qwen3.8-27b vllm-official-fp16-tp2-mtp1
 ```
 
 Benchmark a running target (single-request latency, or aggregate throughput):

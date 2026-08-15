@@ -58,3 +58,42 @@ The server result is the practical interactive number. Its decode rate is
 The requested `unsloth/Qwen3.8-27B-GGUF` repository did not publish a separate
 MTP draft GGUF at measurement time. No draft artifact from another publisher
 was mixed into this result.
+
+## Official unquantized checkpoint
+
+The `vllm-official-fp16-tp2` profile downloads `Qwen/Qwen3.8-27B` directly and
+loads its unquantized safetensors. The source weights are BF16; because Turing
+cannot execute BF16 natively, vLLM casts them to FP16. Results are recorded
+separately from GGUF so precision and runtime effects are not conflated.
+
+The 18 official shards contain 55,563,006,776 bytes. vLLM 0.21.0 loaded them
+across GPUs 2-3 with 25.24 GiB of model memory per GPU. The non-MTP profile
+created a 511,180-token KV cache, enough for 15.6 concurrent 32,768-token
+requests.
+
+| Official FP16 runtime configuration | Result |
+|---|---:|
+| TP2, one request, 512 output tokens | **16.99 tok/s** |
+| TP2, concurrency 4, eight 256-token requests | **70.68 aggregate tok/s** |
+| Mean per-request rate at concurrency 4 | 17.71 tok/s |
+
+### Built-in MTP-1
+
+The official checkpoint's built-in MTP head works through vLLM with one draft
+token. A stale FlashInfer build cache initially retained Conda GCC 15; after a
+clean rebuild, the required host settings were GCC 13 and
+`FLASHINFER_EXTRA_LDFLAGS=-L/home/algore/miniconda3/lib`.
+
+| MTP-1 metric | Result |
+|---|---:|
+| Steady one-request throughput, 512 output tokens | **31.44 tok/s** |
+| Improvement over non-MTP | **85.0%** |
+| Accepted draft tokens | 468 / 554 (**84.5%**) |
+| KV cache capacity | 453,174 tokens |
+| Maximum 32,768-token concurrency | 13.83x |
+
+The first request measured 11.91 tok/s because it included one-time FlashInfer
+kernel compilation. The second identical request is the steady result above.
+Generated output passed a direct correctness smoke test. MTP reduces KV
+capacity by 11.3%, but nearly doubles interactive decode throughput, so
+`vllm-official-fp16-tp2-mtp1` is the recommended official-weight profile.

@@ -51,13 +51,20 @@ args=(
   --fit-target 2048
   --flash-attn "${FLASH_ATTN:-on}"
   --jinja
-  --temp 1.0
-  --top-p 0.95
-  --min-p 0.01
+  --temp "${TEMPERATURE:-1.0}"
+  --top-p "${TOP_P:-0.95}"
+  --min-p "${MIN_P:-0.01}"
   --slot-save-path "$MODEL_DIR/slot-cache"
   --host "$SERVER_HOST"
   --port "$SERVER_PORT"
 )
+
+if [[ -n "${TOP_K:-}" ]]; then
+  args+=(--top-k "$TOP_K")
+fi
+if [[ -n "${CHAT_TEMPLATE_KWARGS:-}" ]]; then
+  args+=(--chat-template-kwargs "$CHAT_TEMPLATE_KWARGS")
+fi
 
 if [[ -n "${CACHE_TYPE_K:-}" ]]; then
   args+=(--cache-type-k "$CACHE_TYPE_K")

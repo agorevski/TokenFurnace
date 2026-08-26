@@ -19,6 +19,7 @@ tuning profile rather than around one model.
 | [Qwen3.6-35B-A3B](targets/qwen3.6-35b-a3b/) | llama.cpp Q4_K_M + MTP (default) / vLLM FP16 | llama.cpp measured; vLLM pending |
 | [Qwen3.8-27B](targets/qwen3.8-27b/) | llama.cpp Q4_K_M / official FP16 vLLM TP2 + MTP | Optimized and measured |
 | [Qwen3.8-27B Uncensored OrcaRouter](targets/qwen3.8-27b-orcarouter/) | llama.cpp Q4_K_M tensor split + MTP-2 | Optimized and measured |
+| [Qwen3.8-Flash-Next](targets/qwen3.8-flash-next/) | llama.cpp Unsloth Q3_K_XL on 2-GPU NVLink pair | Optimized and measured |
 
 ## Layout
 

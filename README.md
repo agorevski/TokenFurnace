@@ -1,6 +1,12 @@
 # RTX 8000 LLM Lab
 
-Reproducible model-serving and performance experiments for a workstation with:
+This repository is a hands-on lab for performance tuning and benchmarking
+Hugging Face models on a four-GPU NVIDIA Quadro RTX 8000 workstation. It
+captures the model artifacts, runtime builds, launch profiles, topology
+experiments, and measured prefill/decode performance needed to reproduce each
+result.
+
+The workstation has:
 
 - 4x NVIDIA Quadro RTX 8000, 48 GiB each
 - NVLink pairs between GPUs 0-1 and 2-3
@@ -8,31 +14,53 @@ Reproducible model-serving and performance experiments for a workstation with:
 - Intel Xeon W-2295 and 256 GiB system RAM
 
 The repository is organized by hardware, model target, runtime backend, and
-tuning profile rather than around one model.
+tuning profile rather than around one model. Model weights are downloaded
+separately and are not committed to Git.
 
-## Targets
+## What's in this repository
 
-| Target | Backend | Status |
-|---|---|---|
-| [DeepSeek V4 Flash 0731](targets/deepseek-v4-flash-0731/) | llama.cpp + DSpark | Optimized and measured |
-| [Qwen3-Coder-Next 80B-A3B](targets/qwen3-coder-next-80b-a3b/) | llama.cpp Q4_K_M 2-GPU (default) / vLLM FP16 | llama.cpp Q4_K_M measured; vLLM FP16 projected |
-| [Qwen3.6-35B-A3B](targets/qwen3.6-35b-a3b/) | llama.cpp Q4_K_M + MTP (default) / vLLM FP16 | llama.cpp measured; vLLM pending |
-| [Qwen3.8-27B](targets/qwen3.8-27b/) | llama.cpp Q4_K_M / official FP16 vLLM TP2 + MTP | Optimized and measured |
-| [Qwen3.8-27B Uncensored OrcaRouter](targets/qwen3.8-27b-orcarouter/) | llama.cpp Q4_K_M tensor split + MTP-2 | Optimized and measured |
-| [Qwen3.8-Flash-Next](targets/qwen3.8-flash-next/) | llama.cpp Unsloth Q3_K_XL on 2-GPU NVLink pair | Optimized and measured |
-| [GLM-5.3-Flash](targets/glm-5.3-flash/) | llama.cpp Unsloth UD-Q3_K_XL on 4 GPUs | Measured |
-| [Laguna S 2.1](targets/laguna-s-2.1/) | llama.cpp Q4_K_M on 4 GPUs | Optimized and measured |
-| [Muse Glimmer 30B](targets/muse-glimmer-30b/) | llama.cpp dynamic Q4_K_XL + DFlash on 1 GPU | Optimized and measured |
+- **Hardware documentation** records the GPU topology, NVLink pairings,
+  firmware, drivers, CUDA capabilities, and installed inference runtimes.
+- **Model targets** define Hugging Face sources, quantizations, GPU placement,
+  runtime-specific settings, and recommended serving profiles.
+- **Benchmark reports** preserve measured native llama.cpp and
+  OpenAI-compatible API results, including unsuccessful configurations where
+  they help explain the selected defaults.
+- **Automation scripts** download model artifacts, build runtime variants,
+  launch servers, run repeatable benchmarks, inspect status, and connect local
+  models to coding agents.
 
-## Layout
+## Documentation
+
+Start with the [four-RTX-8000 hardware profile](hardware/4x-rtx8000/README.md)
+for the constraints shared by every experiment. Each model then has a target
+guide describing its artifacts and profiles, plus a separate performance
+report containing measurements and conclusions.
+
+| Model | Target guide | Performance report | Backend and status |
+|---|---|---|---|
+| DeepSeek V4 Flash 0731 | [Setup and profiles](targets/deepseek-v4-flash-0731/README.md) | [Q4 and DSpark results](targets/deepseek-v4-flash-0731/PERFORMANCE.md) | llama.cpp + DSpark; optimized and measured |
+| Qwen3-Coder-Next 80B-A3B | [Setup and profiles](targets/qwen3-coder-next-80b-a3b/README.md) | [Measured and projected results](targets/qwen3-coder-next-80b-a3b/PERFORMANCE.md) | llama.cpp Q4_K_M measured; vLLM FP16 projected |
+| Qwen3.6-35B-A3B | [Setup and profiles](targets/qwen3.6-35b-a3b/README.md) | [Q4_K_M and MTP results](targets/qwen3.6-35b-a3b/PERFORMANCE.md) | llama.cpp measured; vLLM pending |
+| Qwen3.8-27B | [Setup and profiles](targets/qwen3.8-27b/README.md) | [Topology and runtime results](targets/qwen3.8-27b/PERFORMANCE.md) | llama.cpp Q4_K_M and official FP16 vLLM; optimized and measured |
+| Qwen3.8-27B Uncensored OrcaRouter | [Setup and profiles](targets/qwen3.8-27b-orcarouter/README.md) | [Tensor split and MTP results](targets/qwen3.8-27b-orcarouter/PERFORMANCE.md) | llama.cpp Q4_K_M + MTP-2; optimized and measured |
+| Qwen3.8-Flash-Next | [Setup and profiles](targets/qwen3.8-flash-next/README.md) | [Two- and four-GPU results](targets/qwen3.8-flash-next/PERFORMANCE.md) | llama.cpp Unsloth Q3_K_XL; optimized and measured |
+| GLM-5.3-Flash | [Setup and profiles](targets/glm-5.3-flash/README.md) | [Four-GPU results](targets/glm-5.3-flash/PERFORMANCE.md) | llama.cpp Unsloth UD-Q3_K_XL; measured |
+| Laguna S 2.1 | [Setup and profiles](targets/laguna-s-2.1/README.md) | [Baseline and DFlash results](targets/laguna-s-2.1/PERFORMANCE.md) | llama.cpp Q4_K_M; optimized and measured |
+| Muse Glimmer 30B | [Setup and profiles](targets/muse-glimmer-30b/README.md) | [Baseline and DFlash results](targets/muse-glimmer-30b/PERFORMANCE.md) | llama.cpp dynamic Q4_K_XL; optimized and measured |
+
+## Repository layout
 
 ```text
-hardware/<profile>/       Workstation topology, firmware, and runtime support
-targets/<model>/          Model metadata, profiles, and performance results
-scripts/backends/         Runtime-specific launch implementations
-scripts/serve-model.sh    Generic target/profile launcher
-scripts/download-model.sh Generic Hugging Face downloader
-scripts/benchmark-model.sh OpenAI-compatible API benchmark
+hardware/<profile>/         Workstation topology, firmware, and runtime support
+targets/<model>/README.md   Model source, artifacts, profiles, and usage
+targets/<model>/PERFORMANCE.md
+                            Benchmark conditions, results, and conclusions
+targets/<model>/profiles/   Reproducible runtime configuration
+scripts/backends/           Runtime-specific launch implementations
+scripts/serve-model.sh      Generic target/profile launcher
+scripts/download-model.sh   Generic Hugging Face downloader
+scripts/benchmark-model.sh  OpenAI-compatible API benchmark
 scripts/benchmark-native.sh llama.cpp prefill/decode kernel benchmark
 ```
 
@@ -143,7 +171,3 @@ Inspect status:
 ```
 
 Downloaded model weights remain outside Git under `/home/algore/models`.
-
-See the [four-RTX-8000 hardware profile](hardware/4x-rtx8000/) for the
-firmware snapshot, installed runtime versions, numerical support, and backend
-compatibility constraints.

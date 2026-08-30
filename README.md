@@ -61,6 +61,13 @@ scripts/benchmark-model.sh  OpenAI-compatible API benchmark
 scripts/benchmark-native.sh llama.cpp prefill/decode kernel benchmark
 ```
 
+## Claude slash commands
+
+- `/document-hardware` — invoke when auditing or refreshing the workstation's
+  hardware, firmware, topology, CUDA, runtime, and compatibility documentation.
+- `/benchmark-model` — invoke when adding or benchmarking a model target,
+  comparing profiles or GPU topologies, or documenting measured performance.
+
 ## Usage
 
 DeepSeek balanced profile:

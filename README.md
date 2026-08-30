@@ -1,10 +1,7 @@
-# RTX 8000 LLM Lab
+# TokenFurnace
 
-This repository is a hands-on lab for performance tuning and benchmarking
-Hugging Face models on a four-GPU NVIDIA Quadro RTX 8000 workstation. It
-captures the model artifacts, runtime builds, launch profiles, topology
-experiments, and measured prefill/decode performance needed to reproduce each
-result.
+Performance tuning and benchmarks for Hugging Face models on four NVIDIA
+Quadro RTX 8000 GPUs.
 
 The workstation has:
 

@@ -20,6 +20,9 @@ tuning profile rather than around one model.
 | [Qwen3.8-27B](targets/qwen3.8-27b/) | llama.cpp Q4_K_M / official FP16 vLLM TP2 + MTP | Optimized and measured |
 | [Qwen3.8-27B Uncensored OrcaRouter](targets/qwen3.8-27b-orcarouter/) | llama.cpp Q4_K_M tensor split + MTP-2 | Optimized and measured |
 | [Qwen3.8-Flash-Next](targets/qwen3.8-flash-next/) | llama.cpp Unsloth Q3_K_XL on 2-GPU NVLink pair | Optimized and measured |
+| [GLM-5.3-Flash](targets/glm-5.3-flash/) | llama.cpp Unsloth UD-Q3_K_XL on 4 GPUs | Measured |
+| [Laguna S 2.1](targets/laguna-s-2.1/) | llama.cpp Q4_K_M on 4 GPUs | Optimized and measured |
+| [Muse Glimmer 30B](targets/muse-glimmer-30b/) | llama.cpp dynamic Q4_K_XL + DFlash on 1 GPU | Optimized and measured |
 
 ## Layout
 
@@ -83,6 +86,27 @@ native Turing FP16 on load):
 ```bash
 ./scripts/download-model.sh qwen3.8-27b vllm-official-fp16-tp2
 ./scripts/serve-model.sh qwen3.8-27b vllm-official-fp16-tp2-mtp1
+```
+
+GLM-5.3-Flash UD-Q3_K_XL on all four GPUs:
+
+```bash
+./scripts/download-model.sh glm-5.3-flash
+./scripts/serve-model.sh glm-5.3-flash
+```
+
+Laguna S 2.1 Q4_K_M on all four GPUs:
+
+```bash
+./scripts/download-model.sh laguna-s-2.1
+./scripts/serve-model.sh laguna-s-2.1
+```
+
+Muse Glimmer 30B dynamic Q4_K_XL with DFlash on one GPU:
+
+```bash
+./scripts/download-model.sh muse-glimmer-30b
+./scripts/serve-model.sh muse-glimmer-30b
 ```
 
 Benchmark a running target (single-request latency, or aggregate throughput):

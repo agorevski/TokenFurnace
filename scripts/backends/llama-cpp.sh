@@ -138,6 +138,15 @@ if [[ "${DSPARK:-0}" != 0 ]]; then
     --spec-draft-p-min "$SPEC_DRAFT_P_MIN"
     --spec-draft-ngl 99
   )
+elif [[ -n "${DRAFT_MODEL:-}" ]]; then
+  require_file "$DRAFT_MODEL"
+  args+=(--spec-draft-model "$DRAFT_MODEL")
+  if [[ -n "${SPEC_DRAFT_NGL:-}" ]]; then
+    args+=(--spec-draft-ngl "$SPEC_DRAFT_NGL")
+  fi
+  if [[ -n "${SPEC_DRAFT_OVERRIDE_TENSOR:-}" ]]; then
+    args+=(--spec-draft-override-tensor "$SPEC_DRAFT_OVERRIDE_TENSOR")
+  fi
 fi
 
 if [[ -n "${SPEC_TYPE:-}" ]]; then

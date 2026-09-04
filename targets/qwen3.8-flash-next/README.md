@@ -12,21 +12,30 @@ agreement in Unsloth's published quantization analysis. It fits on one 96 GiB
 NVLink pair at the default 64K context, avoiding four-GPU collectives across
 the workstation's PCIe-separated NVLink pairs.
 
-This model currently requires
-[llama.cpp PR 27742](https://github.com/ggml-org/llama.cpp/pull/27742). The
-profiles therefore use the isolated `build-qwen38-next` build rather than the
-repository's stable llama.cpp build.
+This model and its external MTP draft head currently require
+[llama.cpp PR 28243](https://github.com/ggml-org/llama.cpp/pull/28243). The
+profiles therefore use an isolated checkout and `build-sm75` build rather than
+the repository's stable llama.cpp build.
 
-The current Unsloth Q3 GGUF does not include the official checkpoint's MTP
-layers, so speculative MTP is unavailable. Tensor split also aborts in the
-required PR build; the default uses the measured two-GPU layer split.
+The optional `llama-cpp-q3xl-2gpu-mtp-q8` profile pairs the Q3 main-model GGUF
+with Unsloth's shared Q8_0 MTP GGUF. It improves measured single-request decode
+throughput by 45.7%, with about 79.6% draft acceptance. Fixed-seed output was
+valid but not byte-identical to the no-MTP result, so the no-MTP profile remains
+the behavior-safe default. Tensor split also aborts in the required PR build;
+both supported profiles use the measured two-GPU layer split.
 
 ```bash
 ./scripts/download-model.sh qwen3.8-flash-next
 ./scripts/benchmark-native.sh qwen3.8-flash-next
 ./scripts/serve-model.sh qwen3.8-flash-next
 ./scripts/benchmark-model.sh qwen3.8-flash-next -- --max-tokens 512
+
+# Optional shared-Q8 MTP path
+./scripts/download-model.sh qwen3.8-flash-next llama-cpp-q3xl-2gpu-mtp-q8
+./scripts/serve-model.sh qwen3.8-flash-next llama-cpp-q3xl-2gpu-mtp-q8
+./scripts/benchmark-model.sh qwen3.8-flash-next \
+  llama-cpp-q3xl-2gpu-mtp-q8 -- --max-tokens 256
 ```
 
-See [PERFORMANCE.md](PERFORMANCE.md) for the measured topology and ubatch
-sweeps.
+See [PERFORMANCE.md](PERFORMANCE.md) for the measured topology, ubatch, and MTP
+comparisons.

@@ -1,0 +1,8 @@
+Downloading unsloth/Qwen3.8-Flash-Next-GGUF for target=qwen3.8-flash-next profile=llama-cpp-q3xl-2gpu-mtp-q8 to /home/algore/models/qwen3.8-flash-next-q3xl-gguf
+/dev/nvme0n1p2  1.8T  1.4T  340G  81% /
+A new version of huggingface_hub (1.30.0) is available! You are using version 1.12.0.
+To update, run: /home/algore/miniconda3/bin/python3.13 -m pip install -U huggingface_hub
+
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [00:26<01:20, 26.73s/it]Fetching 4 files: 100%|██████████| 4/4 [00:26<00:00,  6.68s/it]
+[32m✓ Downloaded[0m
+  path: /home/algore/models/qwen3.8-flash-next-q3xl-gguf

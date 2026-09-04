@@ -1,0 +1,13 @@
+# Quicksort in Python
+
+## Simple (Pythonic) Version
+
+```python
+def quicksort(arr):
+    """Simple quicksort using list comprehensions. O(n log n) avg, O(n²) worst."""
+    if len(arr) <= 1:
+        return arr
+
+    pivot = arr[len(arr) // 2]
+    left   = [x for x in arr if x < pivot]
+    middle = [x for x

@@ -1,0 +1,22 @@
+Serving target=qwen3.8-flash-next profile=llama-cpp-q3xl-2gpu backend=llama.cpp on http://127.0.0.1:8094
+0.00.338.292 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.338.630 W srv  llama_server: -----------------
+0.00.338.632 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.338.632 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.338.632 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.338.632 W srv  llama_server: -----------------
+0.00.340.039 I srv    load_model: loading model '/home/algore/models/qwen3.8-flash-next-q3xl-gguf/UD-Q3_K_XL/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf'
+0.12.747.488 I cmn          init: llama threadpool init, n_threads = 18
+0.12.845.235 W srv    load_model: cache_reuse is not supported by this context, it will be disabled
+0.12.891.541 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 65536, kv_unified = 'false'
+0.12.897.401 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.12.897.411 I srv  llama_server: model loaded
+0.12.897.413 I srv  llama_server: listening on http://127.0.0.1:8094
+0.14.332.611 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+0.14.332.763 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.17.542.520 I slot print_timing: id  0 | task 0 | n_gen =    135, tg =  44.65 t/s, tg_3s =  44.98 t/s
+0.20.229.120 I slot print_timing: id  0 | task 0 | prompt eval time =     208.44 ms /    17 tokens (   12.26 ms per token,    81.56 tokens per second)
+0.20.229.124 I slot print_timing: id  0 | task 0 |        eval time =    5687.89 ms /   256 tokens (   22.31 ms per token,    44.83 tokens per second)
+0.20.229.124 I slot print_timing: id  0 | task 0 |       total time =    5896.33 ms /   273 tokens
+0.20.229.125 I slot print_timing: id  0 | task 0 |    graphs reused =        254
+0.20.229.145 I slot      release: id  0 | task 0 | stop processing: n_tokens = 272, truncated = 0

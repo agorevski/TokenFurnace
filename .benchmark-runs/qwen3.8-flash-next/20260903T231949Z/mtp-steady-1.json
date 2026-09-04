@@ -1,0 +1,8 @@
+{
+  "elapsed_seconds": 4.122408788010944,
+  "prompt_tokens": 17,
+  "completion_tokens": 256,
+  "end_to_end_prompt_tokens_per_second": 4.123802581015377,
+  "output_tokens_per_second": 62.09961533764332,
+  "finish_reason": "length"
+}

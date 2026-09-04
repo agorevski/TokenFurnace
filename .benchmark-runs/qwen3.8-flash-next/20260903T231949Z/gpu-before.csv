@@ -1,0 +1,5 @@
+index, name, temperature.gpu, power.draw [W], clocks.current.sm [MHz], clocks.current.memory [MHz], memory.used [MiB], utilization.gpu [%]
+0, Quadro RTX 8000, 35, 23.24 W, 300 MHz, 405 MHz, 7 MiB, 0 %
+1, Quadro RTX 8000, 40, 30.37 W, 300 MHz, 405 MHz, 7 MiB, 0 %
+2, Quadro RTX 8000, 44, 22.56 W, 300 MHz, 405 MHz, 7 MiB, 0 %
+3, Quadro RTX 8000, 43, 33.21 W, 300 MHz, 405 MHz, 17 MiB, 0 %

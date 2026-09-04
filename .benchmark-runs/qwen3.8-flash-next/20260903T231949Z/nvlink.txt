@@ -1,0 +1,12 @@
+GPU 0: Quadro RTX 8000 (UUID: GPU-c5d6982f-2baa-cd47-760e-2c530e26b4a6)
+	 Link 0: 25.781 GB/s
+	 Link 1: 25.781 GB/s
+GPU 1: Quadro RTX 8000 (UUID: GPU-c0141dab-9119-5e21-a6cd-53e561c76dec)
+	 Link 0: 25.781 GB/s
+	 Link 1: 25.781 GB/s
+GPU 2: Quadro RTX 8000 (UUID: GPU-853c4056-7a77-1117-4072-bc8d839ac066)
+	 Link 0: 25.781 GB/s
+	 Link 1: 25.781 GB/s
+GPU 3: Quadro RTX 8000 (UUID: GPU-32370bf5-51e4-f9d7-01d6-57a9b212ec14)
+	 Link 0: 25.781 GB/s
+	 Link 1: 25.781 GB/s

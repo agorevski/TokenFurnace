@@ -1,0 +1,27 @@
+Serving target=qwen3.8-flash-next profile=llama-cpp-q3xl-2gpu-mtp-q8 backend=llama.cpp on http://127.0.0.1:8094
+0.00.354.719 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.355.051 W srv  llama_server: -----------------
+0.00.355.053 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.355.053 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.355.053 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.355.053 W srv  llama_server: -----------------
+0.00.356.408 I srv    load_model: loading model '/home/algore/models/qwen3.8-flash-next-q3xl-gguf/UD-Q3_K_XL/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf'
+0.01.834.660 E llama_model_load: error loading model: borrow_shared_tensor: this model is a draft head without its own 'token_embd.weight'; load it as a draft of its target model, not on its own
+0.01.834.679 E llama_model_load_from_file_impl: failed to load model
+0.01.834.727 W operator(): failed to measure the memory of the extra model, fitting without it: failed to load model
+0.13.306.806 I cmn          init: llama threadpool init, n_threads = 18
+0.13.406.864 I common_speculative_init_result: loading draft model '/home/algore/models/qwen3.8-flash-next-q3xl-gguf/MTP/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf'
+0.14.686.155 W srv    load_model: cache_reuse is not supported by this context, it will be disabled
+0.14.731.390 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 65536, kv_unified = 'false'
+0.15.169.593 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.15.169.602 I srv  llama_server: model loaded
+0.15.169.604 I srv  llama_server: listening on http://127.0.0.1:8094
+0.15.235.637 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+0.15.235.769 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.18.581.506 I slot print_timing: id  0 | task 0 | n_gen =    186, tg =  61.25 t/s, tg_3s =  61.58 t/s
+0.19.530.857 I slot print_timing: id  0 | task 0 | prompt eval time =     325.06 ms /    17 tokens (   19.12 ms per token,    52.30 tokens per second)
+0.19.530.861 I slot print_timing: id  0 | task 0 |        eval time =    3970.01 ms /   256 tokens (   15.57 ms per token,    64.23 tokens per second)
+0.19.530.862 I slot print_timing: id  0 | task 0 |       total time =    4295.07 ms /   273 tokens
+0.19.530.863 I slot print_timing: id  0 | task 0 |    graphs reused =         99
+0.19.530.866 I slot print_timing: id  0 | task 0 | draft acceptance = 0.77000 (  154 accepted /   200 generated), mean len =  2.54
+0.19.530.901 I slot      release: id  0 | task 0 | stop processing: n_tokens = 272, truncated = 0

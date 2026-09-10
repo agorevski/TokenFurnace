@@ -59,6 +59,11 @@ args=(
   --port "$SERVER_PORT"
 )
 
+if [[ -n "${MMPROJ:-}" ]]; then
+  require_file "$MMPROJ"
+  args+=(--mmproj "$MMPROJ")
+fi
+
 if [[ -n "${TOP_K:-}" ]]; then
   args+=(--top-k "$TOP_K")
 fi

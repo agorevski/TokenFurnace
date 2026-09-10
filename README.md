@@ -45,6 +45,10 @@ report containing measurements and conclusions.
 | GLM-5.3-Flash | [Setup and profiles](targets/glm-5.3-flash/README.md) | [Four-GPU results](targets/glm-5.3-flash/PERFORMANCE.md) | llama.cpp Unsloth UD-Q3_K_XL; measured |
 | Laguna S 2.1 | [Setup and profiles](targets/laguna-s-2.1/README.md) | [Baseline and DFlash results](targets/laguna-s-2.1/PERFORMANCE.md) | llama.cpp Q4_K_M; optimized and measured |
 | Muse Glimmer 30B | [Setup and profiles](targets/muse-glimmer-30b/README.md) | [Baseline and DFlash results](targets/muse-glimmer-30b/PERFORMANCE.md) | llama.cpp dynamic Q4_K_XL; optimized and measured |
+| Spark-X2.5-4B | [Setup and profiles](targets/spark-x2.5-4b/README.md) | [Single-GPU Q8 results](targets/spark-x2.5-4b/PERFORMANCE.md) | XHToken llama.cpp Q8_0; measured |
+| Ternary Bonsai 27B | [Setup and profiles](targets/ternary-bonsai-27b/README.md) | [Single-GPU ternary results](targets/ternary-bonsai-27b/PERFORMANCE.md) | PrismML llama.cpp PQ2_0; measured |
+| Gemma 4 12B | [Setup and profiles](targets/gemma-4-12b/README.md) | [Text and vision results](targets/gemma-4-12b/PERFORMANCE.md) | llama.cpp Q4_K_M plus F16 projector; measured |
+| Nex-N2.5-mini | [Setup and profiles](targets/nex-n2.5-mini/README.md) | [Text and vision results](targets/nex-n2.5-mini/PERFORMANCE.md) | llama.cpp Q4_K_M plus F16 projector; measured |
 
 ## Repository layout
 

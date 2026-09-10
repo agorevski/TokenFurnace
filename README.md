@@ -49,6 +49,7 @@ report containing measurements and conclusions.
 | Ternary Bonsai 27B | [Setup and profiles](targets/ternary-bonsai-27b/README.md) | [Single-GPU ternary results](targets/ternary-bonsai-27b/PERFORMANCE.md) | PrismML llama.cpp PQ2_0; measured |
 | Gemma 4 12B | [Setup and profiles](targets/gemma-4-12b/README.md) | [Text and vision results](targets/gemma-4-12b/PERFORMANCE.md) | llama.cpp Q4_K_M plus F16 projector; measured |
 | Nex-N2.5-mini | [Setup and profiles](targets/nex-n2.5-mini/README.md) | [Text and vision results](targets/nex-n2.5-mini/PERFORMANCE.md) | llama.cpp Q4_K_M plus F16 projector; measured |
+| MiniMax-M2.5 | [Setup and profiles](targets/minimax-m2.5/README.md) | [Two-GPU Q2 results](targets/minimax-m2.5/PERFORMANCE.md) | llama.cpp Q2_K on one NVLink pair; measured |
 
 ## Repository layout
 

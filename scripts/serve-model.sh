@@ -35,6 +35,15 @@ load_target "$target" "$profile"
 printf 'Serving target=%s profile=%s backend=%s on http://%s:%s\n' \
   "$TARGET" "$PROFILE" "$BACKEND" "$SERVER_HOST" "$SERVER_PORT"
 
+profile_file=$TARGET_DIR/profiles/$PROFILE.env
+printf 'Profile data (%s):\n' "$profile_file"
+while IFS= read -r line; do
+  if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)= ]]; then
+    name=${BASH_REMATCH[1]}
+    printf '  %s=%q\n' "$name" "${!name}"
+  fi
+done < "$profile_file"
+
 case "$BACKEND" in
   llama.cpp) source "$SCRIPT_DIR/backends/llama-cpp.sh" ;;
   vllm) source "$SCRIPT_DIR/backends/vllm.sh" ;;

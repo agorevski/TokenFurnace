@@ -36,6 +36,20 @@ MTP head, exposed by the separate `vllm-official-fp16-tp2-mtp1` profile.
 Row split was also tested and failed to load on this llama.cpp build, so no
 nonfunctional row profile is shipped.
 
+## KV and prefix caching
+
+All profiles keep the generation KV cache enabled and reuse matching prompt
+prefixes. The llama.cpp profiles reserve up to 128 GiB of host RAM for cached
+KV prefixes, preserve idle slots, and reuse matching chunks of at least 256
+tokens. The vLLM profiles enable automatic prefix caching with aligned hybrid
+Mamba/DeltaNet state and collision-resistant SHA-256 keys.
+
+Neither llama.cpp nor vLLM exposes a time-based KV-cache TTL. Cached prefixes
+therefore remain available for the requested 24-hour operating window as long
+as the server stays running and cache pressure does not evict them. A server
+restart clears the in-memory cache; the 128 GiB llama.cpp limit is intentionally
+bounded rather than risking host exhaustion with unlimited caching.
+
 ## Setup and run
 
 From the repository root, run the target-specific setup once. It validates the

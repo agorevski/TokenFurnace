@@ -2,6 +2,33 @@
 
 ## Measured results
 
+### Full-context serving smoke benchmark
+
+Recorded 2026-09-20 UTC with `unsloth/Qwen3.8-27B-GGUF`
+`Qwen3.8-27B-Q4_K_M.gguf` (17,106,773,984 bytes), llama.cpp commit
+`035e22731a7fd70b9854b3a2d64ec68e9b1a45d3` (build 359), CUDA `sm_75`,
+flash attention, tensor split `1,1` across NVLink-connected GPUs 2-3, context
+262,144, batch 8192, ubatch 2048, and one server slot.
+
+The server loaded successfully with a reported 262,144-token slot and used
+17,851 MiB on GPU 2 and 17,861 MiB on GPU 3 after the measured request. A
+59-token prompt was warmed once, then reused with prompt caching enabled for a
+256-token generation:
+
+| Metric | Result |
+|---|---:|
+| End-to-end latency | 5.769 s |
+| End-to-end output throughput | **44.38 tok/s** |
+| Server-reported decode | **45.77 tok/s** |
+| Finish reason | `length` (256 / 256 tokens) |
+
+A separate correctness request returned the requested `context-ok` text. This
+quick test validates full-context allocation and short warm-cache generation;
+it does **not** measure prefill throughput for a 262,144-token prompt. GPUs 2
+and 3 reached 81 C and 79 C respectively at the post-request sample, with no
+server errors observed. Raw evidence is retained under
+`.benchmark-runs/qwen3.8-27b/20260920T045749Z/`.
+
 Recorded 2026-08-14 with `unsloth/Qwen3.8-27B-GGUF`
 `Qwen3.8-27B-Q4_K_M.gguf` (17,106,773,984 bytes), llama.cpp build `15586e2`
 (`b10298`), CUDA sm_75, flash attention, batch 8192, ubatch 2048, and five

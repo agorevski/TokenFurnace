@@ -7,13 +7,17 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 usage() {
   cat <<'EOF'
-Usage: build-llama-cpp.sh [--clean]
+Usage: build-llama-cpp.sh [--clean] [--update]
 
 Builds current llama.cpp for four RTX 8000 GPUs:
   CUDA architecture 75
   CUDA graphs and Flash Attention
   NCCL when installed
   peer access through batch size 2048
+
+Options:
+  --clean   Remove the existing build directory before configuring
+  --update  Fast-forward the existing source checkout before building
 
 Environment:
   LLAMA_DIR     Source checkout
@@ -25,12 +29,16 @@ EOF
 }
 
 clean=0
-case "${1:-}" in
-  "") ;;
-  --clean) clean=1 ;;
-  -h|--help) usage; exit 0 ;;
-  *) usage >&2; exit 2 ;;
-esac
+update=0
+while (($#)); do
+  case "$1" in
+    --clean) clean=1 ;;
+    --update) update=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+  esac
+  shift
+done
 
 for cmd in git cmake gcc g++ nproc; do
   require_command "$cmd"
@@ -38,7 +46,7 @@ done
 
 if [[ ! -d "$LLAMA_DIR/.git" ]]; then
   git clone --depth 1 https://github.com/ggml-org/llama.cpp.git "$LLAMA_DIR"
-else
+elif ((update)); then
   git -C "$LLAMA_DIR" pull --ff-only
 fi
 

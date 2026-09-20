@@ -33,6 +33,30 @@ MTP head, exposed by the separate `vllm-official-fp16-tp2-mtp1` profile.
 Row split was also tested and failed to load on this llama.cpp build, so no
 nonfunctional row profile is shipped.
 
+## Setup and run
+
+From the repository root, run the target-specific setup once. It validates the
+GPU/CUDA tools, builds llama.cpp for the RTX 8000's `sm_75` architecture, and
+downloads the measured Q4_K_M artifact:
+
+```bash
+./scripts/setup-qwen3.8-27b.sh
+```
+
+Then start the OpenAI-compatible server:
+
+```bash
+./scripts/serve-model.sh qwen3.8-27b
+```
+
+The default profile uses NVLink-connected GPUs 2 and 3 and listens at
+`http://127.0.0.1:8092/v1` with model alias `qwen3.8-27b`. From another
+terminal, verify that loading completed:
+
+```bash
+./scripts/status.sh qwen3.8-27b
+```
+
 ## Official unquantized checkpoint
 
 The official checkpoint contains 55,562,855,904 bytes of BF16 language and

@@ -29,11 +29,11 @@ fi
 if [[ -n "${KV_CACHE_DTYPE:-}" ]]; then
   args+=(--kv-cache-dtype "$KV_CACHE_DTYPE")
 fi
-# Automatic prefix caching (APC). Disabled by default in vLLM for the
-# Qwen3-Next hybrid model; opt in per profile so DeepSeek/other targets that
-# leave these unset keep the stock behavior. The Mamba/GatedDeltaNet layers
-# require an explicit cache mode ("align" is experimental) and a hash algo.
-if [[ "${ENABLE_PREFIX_CACHING:-0}" != 0 ]]; then
+# Preserve the runtime default when unset; zero must explicitly disable APC.
+# Hybrid Mamba/GatedDeltaNet models also need a supported cache mode.
+if [[ "${ENABLE_PREFIX_CACHING:-}" == 0 ]]; then
+  args+=(--no-enable-prefix-caching)
+elif [[ -n "${ENABLE_PREFIX_CACHING:-}" ]]; then
   args+=(--enable-prefix-caching)
   if [[ -n "${MAMBA_CACHE_MODE:-}" ]]; then
     args+=(--mamba-cache-mode "$MAMBA_CACHE_MODE")

@@ -12,7 +12,7 @@ if [[ -f "$PROJECT_DIR/config.env" ]]; then
 fi
 
 HARDWARE_PROFILE=${HARDWARE_PROFILE:-4x-rtx8000}
-SERVER_HOST=${SERVER_HOST:-127.0.0.1}
+SERVER_HOST=${SERVER_HOST:-0.0.0.0}
 
 die() {
   printf 'error: %s\n' "$*" >&2

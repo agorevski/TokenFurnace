@@ -20,6 +20,29 @@ measured independently.
 ./scripts/serve-model.sh ternary-bonsai-2-27b
 ```
 
+The `llama-cpp-turboquant-1gpu` profile uses the optimized
+[`agorevski/bonsai-squared`](https://github.com/agorevski/bonsai-squared)
+runtime with `KTQ2_1` keys and `VTQ2_2` values. It runs on GPU 0 with a
+65,536-token context and exposes the OpenAI model name
+`ternary-bonsai-2-27b-turboquant` on port 8101. Reasoning is enabled with
+`medium` effort by default:
+
+```bash
+./scripts/serve-model.sh ternary-bonsai-2-27b llama-cpp-turboquant-1gpu
+```
+
+Example OpenAI-compatible request:
+
+```bash
+curl http://127.0.0.1:8101/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "ternary-bonsai-2-27b-turboquant",
+    "messages": [{"role": "user", "content": "Reply with exactly: READY"}],
+    "temperature": 0
+  }'
+```
+
 The setup script installs the pinned PrismML CUDA 12.4 runtime required for
 the rotated weights and downloads the measured PQ2_0 default. To install the
 smaller PTQ1_0 pack instead:

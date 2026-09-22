@@ -70,6 +70,12 @@ fi
 if [[ -n "${CHAT_TEMPLATE_KWARGS:-}" ]]; then
   args+=(--chat-template-kwargs "$CHAT_TEMPLATE_KWARGS")
 fi
+if [[ -n "${REASONING:-}" ]]; then
+  args+=(--reasoning "$REASONING")
+fi
+if [[ -n "${REASONING_EFFORT:-}" ]]; then
+  args+=(--reasoning-effort "$REASONING_EFFORT")
+fi
 
 if [[ -n "${CACHE_TYPE_K:-}" ]]; then
   args+=(--cache-type-k "$CACHE_TYPE_K")

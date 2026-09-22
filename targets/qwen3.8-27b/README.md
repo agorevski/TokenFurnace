@@ -67,8 +67,9 @@ Then start the OpenAI-compatible server:
 ```
 
 The default profile uses NVLink-connected GPUs 2 and 3, allocates the full
-262,144-token context, and listens at `http://127.0.0.1:8092/v1` with model
-alias `qwen3.8-27b`. From another terminal, verify that loading completed:
+262,144-token context, enables reasoning at medium effort, and listens at
+`http://127.0.0.1:8092/v1` with model alias `qwen3.8-27b`. From another
+terminal, verify that loading completed:
 
 ```bash
 ./scripts/status.sh qwen3.8-27b

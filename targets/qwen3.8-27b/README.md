@@ -19,6 +19,11 @@ DeltaNet layers and 16 full-attention layers. It has a 5120-wide hidden state,
 | `llama-cpp-q4km-2gpu` | NVLink pair 2-3 | Layer-split baseline |
 | `vllm-official-fp16-tp2` | NVLink pair 2-3 | Official unquantized safetensors; BF16 cast to native Turing FP16 |
 | `vllm-official-fp16-tp2-mtp1` | NVLink pair 2-3 | Fastest official-weight latency; built-in MTP-1 |
+| `vllm-docker-qwen38-fp16-tp2` | NVLink pair 2-3 | Dedicated `vllm/vllm-openai:qwen38` image with official weights cast to FP16 |
+| `vllm-docker-qwen38-awq-int4-1gpu-mtp2` | GPU 1 | Dedicated `qwen38` image with W4A16 AWQ (Q4) and MTP-2 |
+| `vllm-awq-int4-1gpu` | GPU 1 | W4A16 AWQ continuous-batching baseline |
+| `vllm-awq-int4-1gpu-mtp1` | GPU 1 | One-token speculative control |
+| `vllm-awq-int4-1gpu-mtp2` | GPU 1 | Highest measured throughput for 2-5 concurrent coding sessions |
 
 The 17,106,773,984-byte Q4_K_M file is only 15.93 GiB and fits comfortably on
 one 48 GiB RTX 8000. Despite that, tensor parallelism across NVLink pair 2-3 is
@@ -96,6 +101,54 @@ MTP-1 raised steady single-request throughput from 16.99 to 31.44 tok/s with
 and is not representative; benchmark a second identical request for steady
 state. The profile pins GCC 13 and the Conda CUDA runtime link path required by
 that JIT on this host.
+
+### Dedicated qwen38 Docker image with Q4 weights
+
+The upstream `vllm/vllm-openai:qwen38` image can serve the same local official
+model using the vLLM-compatible W4A16 AWQ checkpoint. The Q4 profile mounts
+the checkpoint read-only, uses GPU 1, host networking and IPC, FP16 activations
+and KV cache, Triton attention, and built-in MTP-2. Because this host does not
+have NVIDIA Container Toolkit
+configured for Docker, the profile passes the selected GPU devices and three
+required host driver libraries directly into the otherwise unprivileged
+container. The vLLM compile cache persists under
+`/home/algore/.cache/vllm-qwen38-awq-int4`, avoiding the full first-start
+compilation on every `--rm` container:
+
+```bash
+docker pull vllm/vllm-openai:qwen38
+./scripts/serve-model.sh qwen3.8-27b vllm-docker-qwen38-awq-int4-1gpu-mtp2
+./scripts/benchmark-model.sh qwen3.8-27b vllm-docker-qwen38-awq-int4-1gpu-mtp2 -- --max-tokens 128
+```
+
+The foreground server container is named `tokenfurnace-qwen38` and is removed
+automatically when stopped. The FP16 Docker profile remains available for
+precision comparisons.
+
+## Single-GPU concurrent coding
+
+For 2-5 simultaneous coding sessions on GPU 1, use the measured W4A16 AWQ
+winner:
+
+```bash
+./scripts/download-model.sh qwen3.8-27b vllm-awq-int4-1gpu-mtp2
+./scripts/serve-model.sh qwen3.8-27b vllm-awq-int4-1gpu-mtp2
+```
+
+This profile serves on port 8098 so it can coexist with the llama.cpp service
+on port 8092. It uses FP16 activations and KV cache, 262,144-token context,
+Triton attention, aligned prefix caching, medium reasoning, MTP-2, and
+`max-num-seqs=8`. Server generation defaults use temperature zero and enforce
+a 4,096-token maximum output. On fixed 512-token generations it measured
+86.19, 171.85, and 182.71 aggregate output tok/s at concurrency 2, 4, and 5
+respectively. MTP-2 beat both MTP-1 and no speculation at every tested
+concurrency. See [PERFORMANCE.md](PERFORMANCE.md) for workload, per-session
+rates, artifact hashes, and thermal caveats.
+
+The paged KV cache holds roughly 272K tokens with MTP-2. It can therefore serve
+one request near the full 262K limit, or multiple shorter coding sessions whose
+combined active contexts fit that cache; it cannot hold five simultaneous
+262K-token requests on one 48 GiB GPU.
 
 ```bash
 ./scripts/download-model.sh qwen3.8-27b

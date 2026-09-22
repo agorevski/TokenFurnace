@@ -63,6 +63,12 @@ fi
 if [[ -n "${SPECULATIVE_CONFIG:-}" ]]; then
   args+=(--speculative-config "$SPECULATIVE_CONFIG")
 fi
+if [[ -n "${GENERATION_CONFIG:-}" ]]; then
+  args+=(--generation-config "$GENERATION_CONFIG")
+fi
+if [[ -n "${OVERRIDE_GENERATION_CONFIG:-}" ]]; then
+  args+=(--override-generation-config "$OVERRIDE_GENERATION_CONFIG")
+fi
 if [[ -n "${DEFAULT_CHAT_TEMPLATE_KWARGS:-}" ]]; then
   args+=(--default-chat-template-kwargs "$DEFAULT_CHAT_TEMPLATE_KWARGS")
 fi

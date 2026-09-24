@@ -13,7 +13,15 @@ DeltaNet layers and 16 full-attention layers. It has a 5120-wide hidden state,
 
 | Profile | GPUs | Goal |
 |---|---|---|
-| `llama-cpp-q4km-2gpu-tensor-ctx262k` (default) | NVLink pair 2-3 | Full native 262,144-token context |
+| `llama-cpp-q4km-4gpu-tensor-ctx262k` (default) | GPUs 0-3 | Fastest measured decode and prefill, full 262,144-token context |
+| `llama-cpp-q4km-4gpu-tensor` | GPUs 0-3 | 8192-token controlled benchmark profile |
+| `llama-cpp-q4km-4gpu-layer` | GPUs 0-3 | Layer-split comparison |
+| `llama-cpp-q4km-4gpu-tensor-queues4x` / `llama-cpp-q4km-4gpu-layer-queues4x` | GPUs 0-3 | CUDA launch-queue comparisons |
+| `llama-cpp-q4km-2gpu-tensor-01-ctx262k` | NVLink pair 0-1 | Fastest measured two-GPU decode fallback, full context |
+| `llama-cpp-q4km-2gpu-tensor-01-ctx8k` | NVLink pair 0-1 | Matching-context topology comparison |
+| `llama-cpp-q4km-1gpu-0-ctx8k` | GPU 0 | Single-card topology control |
+| `llama-cpp-q4km-2gpu-tensor-ctx262k` | NVLink pair 2-3 | Full-context option when GPUs 0-1 are occupied |
+| `llama-cpp-q4km-2gpu-tensor-ctx8k` | NVLink pair 2-3 | Matching-context topology and API comparison |
 | `llama-cpp-q4km-2gpu-tensor` | NVLink pair 2-3 | Faster-starting 65,536-token context |
 | `llama-cpp-q4km-1gpu` | GPU 3 | Lower resource use; leaves GPU 2 free |
 | `llama-cpp-q4km-2gpu` | NVLink pair 2-3 | Layer-split baseline |
@@ -26,27 +34,39 @@ DeltaNet layers and 16 full-attention layers. It has a 5120-wide hidden state,
 | `vllm-awq-int4-1gpu-mtp2` | GPU 1 | Highest measured throughput for 2-5 concurrent coding sessions |
 
 The 17,106,773,984-byte Q4_K_M file is only 15.93 GiB and fits comfortably on
-one 48 GiB RTX 8000. Despite that, tensor parallelism across NVLink pair 2-3 is
-the measured winner: 40.37 tok/s native decode and 1113.88 tok/s at 4096-token
-prefill, versus 28.10 and 659.75 tok/s on one GPU. The default extends this
-topology to the model's full 262,144-token native context; a load-and-generate
-test used about 17.85 GiB per GPU and delivered 44.38 output tok/s on a warm
-59-token prompt. See [PERFORMANCE.md](PERFORMANCE.md) for measurement details.
+one 48 GiB RTX 8000. Four-GPU tensor parallelism measured 55.90 tok/s native
+decode and 1625.56 tok/s at 4096-token prefill, versus 42.78 and 1104.21
+tok/s on the NVLink pair in the same sweep. The default retains the model's
+262,144-token context, loaded on all four GPUs and delivered 51.50 end-to-end
+output tok/s on a short request. The four-GPU profiles enable peer access and
+use FP16 KV. Despite the slower PCIe crossing between NVLink pairs, they beat
+the two-GPU option for this model; four-GPU *layer* split was slower for decode.
+See [PERFORMANCE.md](PERFORMANCE.md) for controlled measurements and caveats.
+
+A subsequent matched topology sweep also compared GPU 0 alone and both NVLink
+pairs. Four-GPU tensor still led: 54.17 tok/s native decode versus 44.96 on
+pair 0-1 and 40.60 on pair 2-3. The 0-1 pair is the fastest measured
+two-GPU decode fallback; its full-context profile loaded and generated
+correct text. GPU temperatures reached 85-87 C on the single-card and
+two-card runs, so small differences between pairs should not be generalized
+to other thermal conditions.
 
 The requested Unsloth repository did not expose a separate MTP draft GGUF when
 this target was created. The GGUF profiles therefore do not silently combine
 artifacts from another publisher. The official checkpoint does include its own
 MTP head, exposed by the separate `vllm-official-fp16-tp2-mtp1` profile.
 
-Row split was also tested and failed to load on this llama.cpp build, so no
+Row split was also tested and failed to load on the earlier llama.cpp build, so no
 nonfunctional row profile is shipped.
 
 ## KV and prefix caching
 
-All profiles keep the generation KV cache enabled and reuse matching prompt
-prefixes. The llama.cpp profiles reserve up to 128 GiB of host RAM for cached
-KV prefixes, preserve idle slots, and reuse matching chunks of at least 256
-tokens. The vLLM profiles enable automatic prefix caching with aligned hybrid
+All profiles keep the generation KV cache enabled. The llama.cpp profiles
+reserve up to 128 GiB of host RAM for cached KV prefixes and preserve idle
+slots. This llama.cpp build does not support `cache_reuse` for tensor contexts,
+so the four-GPU tensor profiles do not request 256-token partial-prefix reuse.
+The vLLM profiles enable automatic prefix
+caching with aligned hybrid
 Mamba/DeltaNet state and collision-resistant SHA-256 keys.
 
 Neither llama.cpp nor vLLM exposes a time-based KV-cache TTL. Cached prefixes
@@ -71,14 +91,29 @@ Then start the OpenAI-compatible server:
 ./scripts/serve-model.sh qwen3.8-27b
 ```
 
-The default profile uses NVLink-connected GPUs 2 and 3, allocates the full
-262,144-token context, enables reasoning at medium effort, and listens at
+The default profile uses all four GPUs with equal tensor fractions, peer
+access, flash attention, FP16 KV, stock CUDA launch queues, and the full
+262,144-token context. It enables reasoning at medium effort and listens at
 `http://127.0.0.1:8092/v1` with model alias `qwen3.8-27b`. From another
 terminal, verify that loading completed:
 
 ```bash
 ./scripts/status.sh qwen3.8-27b
 ```
+
+All four GPUs must be available for the default. When only one NVLink pair is
+free, select the matching full-context profile explicitly:
+
+```bash
+./scripts/serve-model.sh qwen3.8-27b llama-cpp-q4km-2gpu-tensor-01-ctx262k
+# Or, if GPUs 0-1 are occupied:
+./scripts/serve-model.sh qwen3.8-27b llama-cpp-q4km-2gpu-tensor-ctx262k
+```
+
+The 262K slot was loaded and tested with short, 5,449-token, and cold
+32,768-token prompts. The 32K request generated 1,024 tokens at 1,414.03
+tok/s server-reported prefill and 51.20 tok/s server-reported decode.
+A 262K-token *prefill* has not been benchmarked.
 
 ## Official unquantized checkpoint
 

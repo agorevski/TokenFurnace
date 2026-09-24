@@ -2,6 +2,154 @@
 
 ## Measured results
 
+### Cold 32K prefill followed by 1K decode (2026-09-23 UTC)
+
+**Measured** in one OpenAI-compatible API request against the four-GPU
+`llama-cpp-q4km-4gpu-tensor-ctx262k` default, using the same
+`Qwen3.8-27B-Q4_K_M.gguf` artifact (SHA-256
+`7b2aec3b9ababdfd75aa17552ee95607d866e44decf547f6f12fcef85cc89f1b`)
+and llama.cpp build 359 described below. The server reserved a 262,144-token
+slot, used tensor fractions `1,1,1,1` on GPUs 0-3, CUDA P2P, NCCL, flash
+attention, FP16 KV, stock CUDA launch queues, batch 8192, and ubatch 2048.
+The prompt was a synthetic, repetitive compiler tutorial request, sized with
+the local chat template/tokenizer to **exactly 32,768 tokens**; temperature
+was zero and the output limit was **1,024 tokens**.
+
+| Phase | Tokens | Server-reported time | Server-reported rate |
+|---|---:|---:|---:|
+| Prefill | 32,768 | 23.174 s | **1,414.03 tok/s** |
+| Decode | 1,024 | 19.979 s | **51.20 tok/s** |
+
+The end-to-end request took **43.525 s**, or **23.53 output tok/s** when
+prefill, generation, and HTTP are all included. Response usage reported
+32,768 prompt tokens, 1,024 completion tokens, and **zero cached tokens**.
+The finish reason was `length`; the generated text was a coherent but
+truncated compiler tutorial, with no malformed-output or server errors.
+These are one-request measurements, not five-repeat native benchmark means.
+GPUs began at 37-48 C and reached up to 86 C during the request; memory clocks
+were 6500 MHz at the post-request sample, so sustained throughput may depend
+on thermal conditions.
+
+The exact prompt, its SHA-256 checksum, profile snapshot, response with
+server `timings`, server log, GPU samples, and measurement JSON are retained
+in `.benchmark-runs/qwen3.8-27b/20260923T190007Z-32k1k/`.
+This validates a 32K prefill *inside* the 262K slot, not the throughput of
+a 262K-token prefill.
+
+### Matched four-layout topology sweep (2026-09-23 UTC)
+
+**Measured** with the same 17,106,773,984-byte `Qwen3.8-27B-Q4_K_M.gguf`
+(SHA-256 `7b2aec3b9ababdfd75aa17552ee95607d866e44decf547f6f12fcef85cc89f1b`)
+and llama.cpp commit `035e22731a7fd70b9854b3a2d64ec68e9b1a45d3`,
+build 359. NCCL was enabled in the CUDA build and resolved from the local
+Conda installation despite not appearing in `ldconfig -p`. All four GPUs
+reported two active NVLink links at 25.781 GB/s; pairs 0-1 and 2-3 are
+connected to each other through PCIe host bridges. With
+`GGML_CUDA_P2P=1`, flash attention, FP16 KV, batch 8192, ubatch 2048, stock
+CUDA launch queues, and five repetitions per native workload:
+
+| Layout / split | 512 prefill (tok/s) | 4096 prefill (tok/s) | 128 decode (tok/s) |
+|---|---:|---:|---:|
+| GPU 0, layer | 719.07 +/- 4.02 | 681.79 +/- 21.11 | 28.58 +/- 0.07 |
+| NVLink 0-1, tensor | 1182.40 +/- 16.67 | 1139.27 +/- 7.27 | 44.96 +/- 0.22 |
+| NVLink 2-3, tensor | 1245.92 +/- 6.36 | 1122.99 +/- 39.89 | 40.60 +/- 1.94 |
+| **All 4, tensor (default)** | **1566.37 +/- 12.70** | **1508.69 +/- 9.18** | **54.17 +/- 0.38** |
+| All 4, layer | 664.87 +/- 1.06 | 1075.81 +/- 7.09 | 11.94 +/- 0.00 |
+
+Four-GPU tensor improved decode by **20.5%** over the faster 0-1 NVLink
+pair, and 4096-token prefill by **32.4%** (`(four / pair - 1) * 100`).
+The faster pair's decode advantage over pair 2-3 was 4.36 tok/s in this
+sweep; both pairs shared the same GPU model and NVLink layout, but cards
+2-3 reached 85 C and GPU 0 reached 87 C in the earlier single-card run.
+Temperatures and sequential test order limit cross-pair attribution. Every
+benchmark started without a competing GPU compute process.
+
+An 8192-context pair 0-1 server also finished a 256-token API request at
+42.16 end-to-end output tok/s (6.072 s, 59 prompt tokens), and a fixed
+5491-token prefill-oriented request at 1083.76 end-to-end prompt tok/s
+(5.067 s, one generated token). It returned exactly `nvlink-pair-ok`
+with finish reason `stop` on a separate correctness request. The
+`llama-cpp-q4km-2gpu-tensor-01-ctx262k` fallback subsequently loaded a
+262,144-token slot on GPUs 0-1, used approximately 17.85 GiB per GPU,
+and returned exactly `pair-full-context-ok`. It was not benchmarked with
+a 262K-token input prompt.
+
+The best **default configuration remains**
+`llama-cpp-q4km-4gpu-tensor-ctx262k`; the best measured two-GPU decode
+fallback is `llama-cpp-q4km-2gpu-tensor-01-ctx262k`. Native JSON, profile
+snapshots, command strings, temperatures, API responses, and errors are
+retained under `.benchmark-runs/qwen3.8-27b/20260923T184542Z-topology/`.
+
+### Four-GPU tensor optimization (2026-09-23 UTC)
+
+**Measured** on four Quadro RTX 8000 GPUs, with NVLink pairs 0-1 and 2-3
+and PCIe traffic between pairs. The exact artifact was
+`unsloth/Qwen3.8-27B-GGUF` `Qwen3.8-27B-Q4_K_M.gguf` (17,106,773,984 bytes,
+SHA-256 `7b2aec3b9ababdfd75aa17552ee95607d866e44decf547f6f12fcef85cc89f1b`).
+The runtime was llama.cpp commit `035e22731a7fd70b9854b3a2d64ec68e9b1a45d3`
+(build 359), compiled for CUDA `sm_75` with NCCL. All native profiles used
+`GGML_CUDA_P2P=1`, flash attention, FP16 KV, 8192 batch, 2048 ubatch, 512-
+and 4096-token prefill and 128-token decode at five repetitions each. CUDA
+launch queues were stock unless labeled `4x`. These are native `llama-bench`
+rates (mean +/- standard deviation, tokens/second), not HTTP rates:
+
+| GPU layout / split | 512 prefill | 4096 prefill | 128 decode |
+|---|---:|---:|---:|
+| 1 GPU (3), layer | 692.19 +/- 11.66 | 627.73 +/- 4.96 | 27.85 +/- 0.16 |
+| 2 GPUs (2-3), tensor | 1156.56 +/- 41.20 | 1104.21 +/- 9.07 | 42.78 +/- 0.31 |
+| **4 GPUs (0-3), tensor** | **1598.90 +/- 9.85** | **1625.56 +/- 25.34** | **55.90 +/- 0.24** |
+| 4 GPUs (0-3), tensor, queues `4x` | 1572.82 +/- 7.08 | 1500.24 +/- 23.95 | 53.31 +/- 0.71 |
+| 4 GPUs (0-3), layer | 681.56 +/- 2.24 | 1110.67 +/- 7.89 | 11.94 +/- 0.01 |
+| 4 GPUs (0-3), layer, queues `4x` | 724.54 +/- 1.29 | 1111.43 +/- 9.81 | 28.77 +/- 0.09 |
+
+The four-GPU tensor mode is 38.2% faster at 512-token prefill, 47.2% faster
+at 4096-token prefill, and 30.7% faster at decode than the two-GPU tensor
+mode (`(four / two - 1) * 100`). A repeat of four-GPU layer with stock queues
+measured 677.94 +/- 1.24, 1094.19 +/- 9.77, and 11.94 +/- 0.01
+respectively; stock-queue layer decode is particularly poor on this host.
+The two-GPU layer control measured 718.26, 831.31, and 28.69 tokens/second.
+An unrelated llama-cli job took GPU 0 during part of the sweep; the affected
+layer run was repeated after that job stopped. GPU 0 reached 83 C and GPU 3
+84 C by the final tensor-queue run; the sequential sweep was not a
+temperature-matched randomized experiment.
+
+For a single-request API comparison, both tensor profiles used one 8192-token
+slot, temperature zero, prompt caching enabled, the same model, and a
+256-token output from the harness's short default prompt. A separate fixed
+5,491-token prompt generated one token for the prefill-oriented request;
+its rate includes HTTP and the generated token, **not** just kernel prefill:
+
+| Profile | Decode request, output tok/s (latency) | Prefill-oriented request, end-to-end prompt tok/s (latency) |
+|---|---:|---:|
+| 2 GPUs, tensor, 8192 context | 41.82 (6.121 s) | 995.47 (5.516 s) |
+| **4 GPUs, tensor, 8192 context** | **48.86 (5.239 s)** | **1324.18 (4.147 s)** |
+
+Both decode requests finished at the 256-token length limit. The four-GPU
+API speedup was 16.8% for output and 33.0% for the prefill-oriented request.
+A separate generation returned exactly `four-gpu-ok` with finish reason `stop`.
+
+**Full-context load and generation:** The promoted
+`llama-cpp-q4km-4gpu-tensor-ctx262k` profile loaded a real 262,144-token
+server slot, used about 9.8 GiB per GPU at idle, and returned exactly
+`full-context-ok` on a correctness request. With medium reasoning enabled,
+its 256-token short-prompt request measured **51.50 end-to-end output tok/s**
+(4.971 s, 17 prompt tokens), and a 5,449-token prefill-oriented request
+measured **1366.31 end-to-end prompt tok/s** (3.988 s, one output token).
+Both ended at their requested length. The full-context profile and the 8192
+profile have different chat-template reasoning settings, so these are separate
+load-and-generate measurements, not a context-size speedup claim. A
+262,144-token prompt was not tested. llama.cpp logged that `cache_reuse` was
+disabled for this tensor context during the measured run; the promoted profile
+does not request that unsupported setting. These requests are not
+partial-prefix-reuse benchmarks.
+
+Raw profiles, commands, build log, artifact hash, GPU samples, native JSON,
+server logs, API responses and failures are retained in
+`.benchmark-runs/qwen3.8-27b/20260923T183007Z/`. GPUs 0 and 1 initially
+hosted unrelated services; they were stopped with permission before the
+four-GPU measurements. The earlier four-GPU layer result was also retaken
+after an unrelated job restarted on GPU 0.
+
 ### Full-context serving smoke benchmark
 
 Recorded 2026-09-20 UTC with `unsloth/Qwen3.8-27B-GGUF`
@@ -42,7 +190,7 @@ Values are mean +/- standard deviation in tokens/second.
 |---|---:|---:|---:|
 | 1 GPU, layer | 715.85 +/- 5.92 | 659.75 +/- 24.91 | 28.10 +/- 0.14 |
 | 2 GPU, layer | 721.88 +/- 4.29 | 875.98 +/- 19.89 | 29.58 +/- 0.10 |
-| **2 GPU, tensor (default)** | **1236.43 +/- 5.44** | **1113.88 +/- 35.67** | **40.37 +/- 1.16** |
+| **2 GPU, tensor (then-default)** | **1236.43 +/- 5.44** | **1113.88 +/- 35.67** | **40.37 +/- 1.16** |
 | 2 GPU, row | failed to load | failed to load | failed to load |
 
 Tensor parallelism is **72.7% faster** than one GPU at 512-token prefill,
@@ -58,7 +206,8 @@ benchmark variants rather than one two-device fraction list.
 Qwen3.8-27B is dense, unlike the sparse Qwen3.6-35B-A3B. Its large dense FFN
 matrix multiplies benefit substantially from tensor parallelism across the
 two-link NVLink pair. The collective overhead is more than repaid in both
-prefill and serial decode, making `llama-cpp-q4km-2gpu-tensor` the default.
+prefill and serial decode; it was the earlier default. The newer four-GPU
+comparison above establishes the current default for an idle four-GPU host.
 
 Native `llama-bench` rates exclude HTTP and chat-template overhead. API output
 rates include prompt evaluation and request handling and are reported
@@ -66,7 +215,8 @@ separately below.
 
 ### OpenAI-compatible server
 
-The default tensor profile loaded successfully, returned valid text, and served
+The then-default two-GPU tensor profile loaded successfully, returned valid
+text, and served
 a cold 71-token prompt plus 512 generated tokens:
 
 | Metric | Result |

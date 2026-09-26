@@ -10,8 +10,8 @@ case "${1:-}" in
     cat <<'USAGE'
 Usage: benchmark-native.sh TARGET [PROFILE] [-- extra benchmark arguments]
 
-Runs a repeatable native backend sweep: 512- and 4096-token prompt processing
-plus 128-token generation, with five repetitions and JSON output.
+Runs the native prompt/decode sweep defined by the target's benchmark baseline
+and emits JSON output.
 USAGE
     exit 0
     ;;
@@ -26,6 +26,8 @@ if (($#)) && [[ "$1" != -- && "$1" != -* ]]; then
 fi
 [[ "${1:-}" != -- ]] || shift
 load_target "$target" "$profile"
+load_benchmark_baseline
+validate_benchmark_profile
 
 case "$BACKEND" in
   llama.cpp)
@@ -54,12 +56,12 @@ case "$BACKEND" in
       -fa "${FLASH_ATTN:-on}"
       -b "${BATCH_SIZE:-2048}"
       -ub "${UBATCH_SIZE:-512}"
-      -r 5
+      -r "$BENCHMARK_REPETITIONS"
       -p 0
       -n 0
-      -pg 512,0
-      -pg 4096,0
-      -pg 0,128
+      -pg "$BENCHMARK_PREFILL_TOKENS_SHORT,0"
+      -pg "$BENCHMARK_PREFILL_TOKENS_LONG,0"
+      -pg "0,$BENCHMARK_OUTPUT_TOKENS"
       -o json
     )
     ;;
@@ -76,9 +78,9 @@ case "$BACKEND" in
       --kv-dtype "${KV_DTYPE:-int8}"
       --max-ctx "$MAX_CONTEXT"
       --prefill-chunk "${PREFILL_CHUNK:-1024}"
-      --n-prompt 512,4096
-      --n-gen 128
-      --repetitions 5
+      --n-prompt "$BENCHMARK_PREFILL_TOKENS_SHORT,$BENCHMARK_PREFILL_TOKENS_LONG"
+      --n-gen "$BENCHMARK_OUTPUT_TOKENS"
+      --repetitions "$BENCHMARK_REPETITIONS"
       --warmup 1
       --output json
     )

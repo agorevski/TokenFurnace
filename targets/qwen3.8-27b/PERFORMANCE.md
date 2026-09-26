@@ -1,7 +1,112 @@
 # Qwen3.8-27B performance
 
-## Measured results
+## Prefill
 
+| Runtime / Checkpoint | Native Workload | Tok/s | Std Deviation |
+|---|---|---:|---:|
+| [llama.cpp b359 / Q4_K_M, 4 GPUs tensor](#four-gpu-optimization) | 512-token prefill | **1598.90** | 9.85 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs tensor, queues 4x](#four-gpu-optimization) | 512-token prefill | 1572.82 | 7.08 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs tensor, matched sweep](#matched-topology) | 512-token prefill | 1566.37 | 12.70 |
+| [llama.cpp b359 / Q4_K_M, NVLink 2-3 tensor, matched sweep](#matched-topology) | 512-token prefill | 1245.92 | 6.36 |
+| [llama.cpp b10298 / Q4_K_M, 2 GPUs tensor](#native-topology) | 512-token prefill | 1236.43 | 5.44 |
+| [llama.cpp b359 / Q4_K_M, NVLink 0-1 tensor](#matched-topology) | 512-token prefill | 1182.40 | 16.67 |
+| [llama.cpp b359 / Q4_K_M, NVLink 2-3 tensor](#four-gpu-optimization) | 512-token prefill | 1156.56 | 41.20 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs layer, queues 4x](#four-gpu-optimization) | 512-token prefill | 724.54 | 1.29 |
+| [llama.cpp b10298 / Q4_K_M, 2 GPUs layer](#native-topology) | 512-token prefill | 721.88 | 4.29 |
+| [llama.cpp b359 / Q4_K_M, GPU 0 layer](#matched-topology) | 512-token prefill | 719.07 | 4.02 |
+| [llama.cpp b359 / Q4_K_M, 2 GPUs layer](#four-gpu-optimization) | 512-token prefill | 718.26 | — |
+| [llama.cpp b10298 / Q4_K_M, 1 GPU layer](#native-topology) | 512-token prefill | 715.85 | 5.92 |
+| [llama.cpp b359 / Q4_K_M, GPU 3 layer](#four-gpu-optimization) | 512-token prefill | 692.19 | 11.66 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs layer](#four-gpu-optimization) | 512-token prefill | 681.56 | 2.24 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs layer repeat](#four-gpu-optimization) | 512-token prefill | 677.94 | 1.24 |
+| [llama.cpp b359 / Q4_K_M, GPU 3 current baseline](#gpu3-comparison) | 512-token prefill | 671.50 | 20.45 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs layer, matched sweep](#matched-topology) | 512-token prefill | 664.87 | 1.06 |
+| [NInfer SM75 / container-v2, MTP-0](#ninfer-v2) | 512-token prefill | 84.47 | 2.01 |
+| [NInfer SM75 / container-v2, MTP-3](#ninfer-v2) | 512-token prefill | 82.30 | 2.71 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs tensor](#four-gpu-optimization) | 4096-token prefill | **1625.56** | 25.34 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs tensor, matched sweep](#matched-topology) | 4096-token prefill | 1508.69 | 9.18 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs tensor, queues 4x](#four-gpu-optimization) | 4096-token prefill | 1500.24 | 23.95 |
+| [llama.cpp b359 / Q4_K_M, NVLink 0-1 tensor](#matched-topology) | 4096-token prefill | 1139.27 | 7.27 |
+| [llama.cpp b359 / Q4_K_M, NVLink 2-3 tensor, matched sweep](#matched-topology) | 4096-token prefill | 1122.99 | 39.89 |
+| [llama.cpp b10298 / Q4_K_M, 2 GPUs tensor](#native-topology) | 4096-token prefill | 1113.88 | 35.67 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs layer, queues 4x](#four-gpu-optimization) | 4096-token prefill | 1111.43 | 9.81 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs layer](#four-gpu-optimization) | 4096-token prefill | 1110.67 | 7.89 |
+| [llama.cpp b359 / Q4_K_M, NVLink 2-3 tensor](#four-gpu-optimization) | 4096-token prefill | 1104.21 | 9.07 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs layer repeat](#four-gpu-optimization) | 4096-token prefill | 1094.19 | 9.77 |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs layer, matched sweep](#matched-topology) | 4096-token prefill | 1075.81 | 7.09 |
+| [llama.cpp b10298 / Q4_K_M, 2 GPUs layer](#native-topology) | 4096-token prefill | 875.98 | 19.89 |
+| [llama.cpp b359 / Q4_K_M, 2 GPUs layer](#four-gpu-optimization) | 4096-token prefill | 831.31 | — |
+| [llama.cpp b359 / Q4_K_M, GPU 0 layer](#matched-topology) | 4096-token prefill | 681.79 | 21.11 |
+| [llama.cpp b10298 / Q4_K_M, 1 GPU layer](#native-topology) | 4096-token prefill | 659.75 | 24.91 |
+| [llama.cpp b359 / Q4_K_M, GPU 3 layer](#four-gpu-optimization) | 4096-token prefill | 627.73 | 4.96 |
+| [llama.cpp b359 / Q4_K_M, GPU 3 current baseline](#gpu3-comparison) | 4096-token prefill | 619.16 | 2.31 |
+| [NInfer SM75 / container-v2, MTP-0](#ninfer-v2) | 4096-token prefill | 79.29 | 0.78 |
+| [NInfer SM75 / container-v2, MTP-3](#ninfer-v2) | 4096-token prefill | 78.25 | 0.22 |
+
+## Decode
+
+| Runtime / Checkpoint | Batch Size | Input Token Length | Aggregate tok/s | Std Deviation | Mean TFTT | Mean TPOT |
+|---|---:|---:|---:|---:|---:|---:|
+| [vLLM 0.21 / W4A16 AWQ, MTP-2](#vllm-awq) | 5 | 17 | **182.71** | — | — | — |
+| [vLLM 0.21 / W4A16 AWQ, MTP-2](#vllm-awq) | 4 | 17 | 171.85 | — | — | — |
+| [vLLM 0.21 / W4A16 AWQ, MTP-1](#vllm-awq) | 5 | 17 | 167.09 | — | — | — |
+| [vLLM 0.21 / W4A16 AWQ, MTP-1](#vllm-awq) | 4 | 17 | 145.26 | — | — | — |
+| [vLLM 0.21 / W4A16 AWQ, no MTP](#vllm-awq) | 5 | 17 | 133.82 | — | — | — |
+| [vLLM 0.21 / W4A16 AWQ, MTP-2, GPU 3](#gpu3-comparison) | 4 | 1,202 | 124.81 | — | 839 ms | 27.81 ms |
+| [vLLM 0.21 / W4A16 AWQ, no MTP](#vllm-awq) | 4 | 17 | 111.00 | — | — | — |
+| [vLLM 0.21 / W4A16 AWQ, MTP-2](#vllm-awq) | 2 | 17 | 86.19 | — | — | — |
+| [vLLM 0.21 / W4A16 AWQ, MTP-1](#vllm-awq) | 2 | 17 | 70.94 | — | — | — |
+| [vLLM 0.21 / official FP16, TP2](#official-fp16) | 4 | — | 70.68 | — | — | — |
+| [vLLM 0.21 / W4A16 AWQ, MTP-2, GPU 3](#gpu3-comparison) | 2 | 1,202 | 67.38 | — | 1,550 ms | 23.25 ms |
+| [vLLM 0.21 / W4A16 AWQ, no MTP](#vllm-awq) | 2 | 17 | 56.68 | — | — | — |
+| [HyperQwen 0.29 / W4A16 AutoRound, eager](#gpu3-comparison) | 4 | 1,538 | 53.53 | — | 1,263 ms | 70.06 ms |
+| [vLLM 0.21 / W4A16 AWQ, MTP-2, warm](#vllm-awq) | 1 | 17 | 53.36 | — | — | — |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs, 262K context](#four-gpu-optimization) | 1 | 17 | 51.50 | — | — | — |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs tensor](#four-gpu-optimization) | 1 | — | 48.86 | — | — | — |
+| [vLLM 0.21 / W4A16 AWQ, MTP-2, GPU 3](#gpu3-comparison) | 1 | 1,202 | 44.83 | — | 339 ms | 21.06 ms |
+| [llama.cpp b359 / Q4_K_M, NVLink 2-3, warm](#full-context-smoke) | 1 | 59 | 44.38 | — | — | — |
+| [vLLM 0.21 / W4A16 AWQ, MTP-1, warm](#vllm-awq) | 1 | 17 | 43.23 | — | — | — |
+| [llama.cpp b10298 / Q4_K_M, NVLink 2-3](#openai-server) | 1 | 71 | 42.97 | — | — | — |
+| [llama.cpp b359 / Q4_K_M, NVLink 0-1 tensor](#matched-topology) | 1 | 59 | 42.16 | — | — | — |
+| [llama.cpp b359 / Q4_K_M, NVLink 2-3 tensor](#four-gpu-optimization) | 1 | — | 41.82 | — | — | — |
+| [vLLM 0.21 / official FP16, TP2, MTP-1, warm](#official-mtp1) | 1 | — | 31.44 | — | — | — |
+| [vLLM 0.21 / W4A16 AWQ, no MTP, warm](#vllm-awq) | 1 | 17 | 31.10 | — | — | — |
+| [HyperQwen 0.29 / W4A16 AutoRound, eager](#gpu3-comparison) | 2 | 1,538 | 27.18 | — | 652 ms | 71.30 ms |
+| [llama.cpp b359 / Q4_K_M, GPU 3, queued clients](#gpu3-comparison) | 4 | 1,538 | 25.99 | — | 22,609 ms | 36.91 ms |
+| [llama.cpp b359 / Q4_K_M, GPU 3](#gpu3-comparison) | 1 | 1,538 | 25.82 | — | 636 ms | 36.39 ms |
+| [llama.cpp b359 / Q4_K_M, 4 GPUs, cold 32K](#cold-32k) | 1 | 32,768 | 23.53 | — | — | — |
+| [NInfer SM75 / container-v2, MTP-3, first request](#ninfer-v2) | 1 | 19 | 22.89 | — | — | — |
+| [NInfer SM75 / container-v2, MTP-3, steady request](#ninfer-v2) | 1 | 19 | 22.27 | — | — | — |
+| [NInfer SM75 / container-v2, MTP-0, first request](#ninfer-v2) | 1 | 19 | 19.94 | — | — | — |
+| [NInfer SM75 / container-v2, MTP-0, steady request](#ninfer-v2) | 1 | 19 | 19.25 | — | — | — |
+| [vLLM 0.21 / official FP16, TP2](#official-fp16) | 1 | — | 16.99 | — | — | — |
+| [HyperQwen 0.29 / W4A16 AutoRound, eager](#gpu3-comparison) | 1 | 1,538 | 14.22 | — | 375 ms | 69.10 ms |
+
+The tables summarize valid retained measurements and are sorted by throughput
+within each workload class. Rows with different input lengths, batch sizes,
+cache states, checkpoints, quantizations, or hardware layouts are not direct
+controlled comparisons. An em dash means the source evidence did not retain
+that metric.
+
+## Detailed results
+
+<a id="gpu3-cold-prefill"></a>
+### GPU 3 cold-prefill cross-runtime baseline
+
+**Unmeasured.** `benchmark.env` now fixes the comparison workload at a
+262,144-token served context, 8,192-token batch cap, cold cache, temperature
+zero, one concurrent request, an exact 32,768-token prompt, and 1,024 requested
+output tokens. The prompt fixture SHA-256 is
+`24a8b4877ce617a49b04a55f3a1e6dabc61664e9060a68c33442fc5c9893af29`.
+
+The paired profiles are `llama-cpp-q4km-1gpu-ctx262k-prefill` and
+`vllm-awq-int4-1gpu-mtp2-gpu3-prefill`. Both use physical GPU 3 and disable
+prefix caching. This is a workload-controlled comparison, not a strict
+same-artifact comparison: llama.cpp uses Q4_K_M GGUF, while vLLM uses W4A16
+AWQ with MTP-2, and vLLM has no direct equivalent for llama.cpp's 2,048-token
+microbatch.
+
+<a id="gpu3-comparison"></a>
 ### GPU 3 single-card baselines versus HyperQwen (2026-09-26)
 
 **Measured** on physical GPU 3 only. Five native repetitions with llama.cpp
@@ -55,6 +160,7 @@ corresponding output is in the ignored sibling checkout at
 supported 32K-context coding-agent check are described in that checkout's
 `docs/turing.md`. Neither a 262K prompt nor a long-concurrency soak was run.
 
+<a id="ninfer-v2"></a>
 ### NInfer container-v2 MTP-0 / MTP-3 comparison (2026-09-25)
 
 **Measured** on GPU 0 with the official
@@ -160,6 +266,7 @@ historical revision `3526913004b1cf552cb57b88d6a5c6f5e4a89a70`, whose
 container-v2 artifact is compatible with the fork's reader. It is measured
 separately in the section above.
 
+<a id="cold-32k"></a>
 ### Cold 32K prefill followed by 1K decode (2026-09-23 UTC)
 
 **Measured** in one OpenAI-compatible API request against the four-GPU
@@ -194,6 +301,7 @@ in `.benchmark-runs/qwen3.8-27b/20260923T190007Z-32k1k/`.
 This validates a 32K prefill *inside* the 262K slot, not the throughput of
 a 262K-token prefill.
 
+<a id="matched-topology"></a>
 ### Matched four-layout topology sweep (2026-09-23 UTC)
 
 **Measured** with the same 17,106,773,984-byte `Qwen3.8-27B-Q4_K_M.gguf`
@@ -238,6 +346,7 @@ fallback is `llama-cpp-q4km-2gpu-tensor-01-ctx262k`. Native JSON, profile
 snapshots, command strings, temperatures, API responses, and errors are
 retained under `.benchmark-runs/qwen3.8-27b/20260923T184542Z-topology/`.
 
+<a id="four-gpu-optimization"></a>
 ### Four-GPU tensor optimization (2026-09-23 UTC)
 
 **Measured** on four Quadro RTX 8000 GPUs, with NVLink pairs 0-1 and 2-3
@@ -308,6 +417,7 @@ hosted unrelated services; they were stopped with permission before the
 four-GPU measurements. The earlier four-GPU layer result was also retaken
 after an unrelated job restarted on GPU 0.
 
+<a id="full-context-smoke"></a>
 ### Full-context serving smoke benchmark
 
 Recorded 2026-09-20 UTC with `unsloth/Qwen3.8-27B-GGUF`
@@ -340,6 +450,7 @@ Recorded 2026-08-14 with `unsloth/Qwen3.8-27B-GGUF`
 (`b10298`), CUDA sm_75, flash attention, batch 8192, ubatch 2048, and five
 repetitions per native test.
 
+<a id="native-topology"></a>
 ### Native topology and split sweep
 
 Values are mean +/- standard deviation in tokens/second.
@@ -371,6 +482,7 @@ Native `llama-bench` rates exclude HTTP and chat-template overhead. API output
 rates include prompt evaluation and request handling and are reported
 separately below.
 
+<a id="openai-server"></a>
 ### OpenAI-compatible server
 
 The then-default two-GPU tensor profile loaded successfully, returned valid
@@ -394,6 +506,7 @@ The requested `unsloth/Qwen3.8-27B-GGUF` repository did not publish a separate
 MTP draft GGUF at measurement time. No draft artifact from another publisher
 was mixed into this result.
 
+<a id="official-fp16"></a>
 ## Official unquantized checkpoint
 
 The `vllm-official-fp16-tp2` profile downloads `Qwen/Qwen3.8-27B` directly and
@@ -412,6 +525,7 @@ requests.
 | TP2, concurrency 4, eight 256-token requests | **70.68 aggregate tok/s** |
 | Mean per-request rate at concurrency 4 | 17.71 tok/s |
 
+<a id="official-mtp1"></a>
 ### Built-in MTP-1
 
 The official checkpoint's built-in MTP head works through vLLM with one draft
@@ -433,6 +547,7 @@ Generated output passed a direct correctness smoke test. MTP reduces KV
 capacity by 11.3%, but nearly doubles interactive decode throughput, so
 `vllm-official-fp16-tp2-mtp1` is the recommended official-weight profile.
 
+<a id="vllm-awq"></a>
 ## Single-GPU W4A16 AWQ serving
 
 **Measured 2026-09-22 UTC.** These tests used

@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 
 import argparse
+import collections
 import json
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 
-def one_request(base_url, model, prompt, max_tokens):
+def one_request(base_url, model, prompt, max_tokens, temperature,
+                expected_prompt_tokens):
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0,
+        "temperature": temperature,
         "max_tokens": max_tokens,
         "stream": False,
     }
@@ -27,10 +29,17 @@ def one_request(base_url, model, prompt, max_tokens):
     usage = result.get("usage", {})
     prompt_tokens = usage.get("prompt_tokens", 0) or 0
     output_tokens = usage.get("completion_tokens", 0) or 0
+    if (expected_prompt_tokens is not None
+            and prompt_tokens != expected_prompt_tokens):
+        raise RuntimeError(
+            "prompt token count does not match benchmark baseline: "
+            f"expected {expected_prompt_tokens}, got {prompt_tokens}"
+        )
     return {
         "elapsed_seconds": elapsed,
         "prompt_tokens": prompt_tokens,
         "completion_tokens": output_tokens,
+        "requested_completion_tokens": max_tokens,
         "end_to_end_prompt_tokens_per_second":
             prompt_tokens / elapsed if prompt_tokens else None,
         "output_tokens_per_second": output_tokens / elapsed if output_tokens else None,
@@ -46,6 +55,9 @@ def main():
     parser.add_argument("--prompt-file",
                         help="Read the prompt from a UTF-8 file")
     parser.add_argument("--max-tokens", type=int, default=256)
+    parser.add_argument("--temperature", type=float, default=0)
+    parser.add_argument("--expected-prompt-tokens", type=int,
+                        help="Fail if API usage reports a different prompt size")
     parser.add_argument("--concurrency", type=int, default=1,
                         help="Number of requests issued in parallel (default 1)")
     parser.add_argument("--requests", type=int, default=None,
@@ -60,6 +72,9 @@ def main():
         parser.error("--requests must be at least 1")
     if args.max_tokens < 1:
         parser.error("--max-tokens must be at least 1")
+    if (args.expected_prompt_tokens is not None
+            and args.expected_prompt_tokens < 1):
+        parser.error("--expected-prompt-tokens must be at least 1")
 
     prompt = args.prompt
     if args.prompt_file:
@@ -69,13 +84,15 @@ def main():
     # Single-request path keeps the original output shape for compatibility.
     if concurrency == 1 and total == 1:
         print(json.dumps(one_request(args.base_url, args.model, prompt,
-                                     args.max_tokens), indent=2))
+                                     args.max_tokens, args.temperature,
+                                     args.expected_prompt_tokens), indent=2))
         return
 
     started = time.perf_counter()
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
         futures = [pool.submit(one_request, args.base_url, args.model,
-                               prompt, args.max_tokens)
+                               prompt, args.max_tokens, args.temperature,
+                               args.expected_prompt_tokens)
                    for _ in range(total)]
         results = [f.result() for f in futures]
     wall = time.perf_counter() - started
@@ -85,12 +102,19 @@ def main():
     per_req = [r["output_tokens_per_second"] for r in results
                if r["output_tokens_per_second"] is not None]
     mean_single = sum(per_req) / len(per_req) if per_req else None
+    finish_reasons = collections.Counter(r["finish_reason"] for r in results)
+    full_output_requests = sum(
+        r["completion_tokens"] == args.max_tokens for r in results
+    )
     print(json.dumps({
         "concurrency": concurrency,
         "total_requests": total,
         "wall_seconds": wall,
         "total_prompt_tokens": prompt_tokens,
         "total_completion_tokens": completion_tokens,
+        "requested_completion_tokens_per_request": args.max_tokens,
+        "full_output_requests": full_output_requests,
+        "finish_reasons": dict(finish_reasons),
         "aggregate_end_to_end_prompt_tokens_per_second":
             prompt_tokens / wall if prompt_tokens else None,
         "aggregate_output_tokens_per_second":

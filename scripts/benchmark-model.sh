@@ -10,6 +10,10 @@ case "${1:-}" in
     cat <<'USAGE'
 Usage: benchmark-model.sh TARGET [PROFILE] [-- benchmark-api.py arguments]
 
+Defaults come from targets/TARGET/benchmark.env. Arguments after -- may
+override those defaults for exploratory runs, but such runs are not baseline
+comparison results.
+
 Examples:
   # Single-request decode latency (default)
   benchmark-model.sh qwen3-coder-next-80b-a3b llama-cpp-q4km
@@ -33,7 +37,16 @@ if (($#)) && [[ "$1" != -- && "$1" != -* ]]; then
 fi
 [[ "${1:-}" != -- ]] || shift
 load_target "$target" "$profile"
+load_benchmark_baseline
+validate_benchmark_profile
 
 exec python3 "$SCRIPT_DIR/benchmark-api.py" \
   --base-url "http://$SERVER_HOST:$SERVER_PORT" \
-  --model "$MODEL_ALIAS" "$@"
+  --model "$MODEL_ALIAS" \
+  --prompt-file "$BENCHMARK_API_PROMPT_FILE" \
+  --expected-prompt-tokens "$BENCHMARK_API_PROMPT_TOKENS" \
+  --max-tokens "$BENCHMARK_API_OUTPUT_TOKENS" \
+  --temperature "$BENCHMARK_TEMPERATURE" \
+  --concurrency "$BENCHMARK_API_CONCURRENCY" \
+  --requests "$BENCHMARK_API_REQUESTS" \
+  "$@"

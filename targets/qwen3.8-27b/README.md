@@ -24,6 +24,7 @@ DeltaNet layers and 16 full-attention layers. It has a 5120-wide hidden state,
 | `llama-cpp-q4km-2gpu-tensor-ctx8k` | NVLink pair 2-3 | Matching-context topology and API comparison |
 | `llama-cpp-q4km-2gpu-tensor` | NVLink pair 2-3 | Faster-starting 65,536-token context |
 | `llama-cpp-q4km-1gpu` | GPU 3 | Lower resource use; leaves GPU 2 free |
+| `llama-cpp-q4km-1gpu-ctx262k-prefill` | GPU 3 | Cold-cache 32K-prefill baseline in a 262K context |
 | `llama-cpp-q4km-2gpu` | NVLink pair 2-3 | Layer-split baseline |
 | `vllm-official-fp16-tp2` | NVLink pair 2-3 | Official unquantized safetensors; BF16 cast to native Turing FP16 |
 | `vllm-official-fp16-tp2-mtp1` | NVLink pair 2-3 | Fastest official-weight latency; built-in MTP-1 |
@@ -33,6 +34,7 @@ DeltaNet layers and 16 full-attention layers. It has a 5120-wide hidden state,
 | `vllm-awq-int4-1gpu-mtp1` | GPU 1 | One-token speculative control |
 | `vllm-awq-int4-1gpu-mtp2` | GPU 1 | Highest measured throughput for 2-5 concurrent coding sessions |
 | `vllm-awq-int4-1gpu-mtp2-gpu3` | GPU 3 | Same AWQ/MTP-2 configuration on the preferred single-GPU performance card |
+| `vllm-awq-int4-1gpu-mtp2-gpu3-prefill` | GPU 3 | Matching cold-cache 32K-prefill workload in a 262K context |
 | `ninfer-groupwise-int-1gpu-mtp0` | GPU 0 | Historical container-v2 baseline; faster on the low-acceptance native corpus |
 | `ninfer-groupwise-int-1gpu-mtp3` | GPU 0 | Historical container-v2 MTP-3; measured short-request API winner |
 
@@ -117,6 +119,30 @@ The 262K slot was loaded and tested with short, 5,449-token, and cold
 32,768-token prompts. The 32K request generated 1,024 tokens at 1,414.03
 tok/s server-reported prefill and 51.20 tok/s server-reported decode.
 A 262K-token *prefill* has not been benchmarked.
+
+## Reproducible benchmark baseline
+
+[`benchmark.env`](benchmark.env) defines the shared GPU 3 cold-prefill
+workload, and [`benchmark-prompt.txt`](benchmark-prompt.txt) is its committed
+32,768-token prompt fixture. Both comparison profiles use a 262,144-token
+context, an 8,192-token batch cap, disabled prefix caching, temperature zero,
+and one request producing either one prefill-isolation token or 1,024 fixed
+output tokens.
+
+Generate and retain the resolved settings before each run:
+
+```bash
+./scripts/benchmark-config.sh qwen3.8-27b \
+  llama-cpp-q4km-1gpu-ctx262k-prefill
+./scripts/benchmark-config.sh qwen3.8-27b \
+  vllm-awq-int4-1gpu-mtp2-gpu3-prefill
+```
+
+The workload is matched, but the model artifacts are not byte-identical:
+llama.cpp uses Q4_K_M GGUF while vLLM uses W4A16 AWQ with MTP-2. vLLM also has
+no direct `UBATCH_SIZE` equivalent. Report the result as a workload-controlled
+runtime/quantization comparison, not a strict same-artifact or fully mapped
+microbatch comparison.
 
 ## Official unquantized checkpoint
 

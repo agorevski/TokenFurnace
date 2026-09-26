@@ -32,6 +32,8 @@ DeltaNet layers and 16 full-attention layers. It has a 5120-wide hidden state,
 | `vllm-awq-int4-1gpu` | GPU 1 | W4A16 AWQ continuous-batching baseline |
 | `vllm-awq-int4-1gpu-mtp1` | GPU 1 | One-token speculative control |
 | `vllm-awq-int4-1gpu-mtp2` | GPU 1 | Highest measured throughput for 2-5 concurrent coding sessions |
+| `ninfer-groupwise-int-1gpu-mtp0` | GPU 0 | Historical container-v2 baseline; faster on the low-acceptance native corpus |
+| `ninfer-groupwise-int-1gpu-mtp3` | GPU 0 | Historical container-v2 MTP-3; measured short-request API winner |
 
 The 17,106,773,984-byte Q4_K_M file is only 15.93 GiB and fits comfortably on
 one 48 GiB RTX 8000. Four-GPU tensor parallelism measured 55.90 tok/s native
@@ -200,3 +202,57 @@ running:
 ./scripts/copilot-local.sh qwen3.8-27b
 ./scripts/claude-local.sh qwen3.8-27b
 ```
+
+## NInfer Turing setup
+
+The NInfer profiles use
+[`mr-september/ninfer-2080ti-22g`](https://github.com/mr-september/ninfer-2080ti-22g)
+at commit `6460bf03a86f1288dc7b240d70c30887199099af`. They pin Hugging Face
+revision `3526913004b1cf552cb57b88d6a5c6f5e4a89a70`, which contains the
+container-v2 `qwen3_8_27b.ninfer` artifact expected by this fork. Its expected
+size is 18,210,531,328 bytes and its SHA-256 is
+`eec39564993d6e9c7d5e383382a760f093465c9d163ec9a1bd6b80199514bf3e`.
+The artifact's minimum runtime revision,
+`52320554b5e71a9da96bff809ddf67ac5773ed63`, is ancestral to the pinned fork.
+
+The fork's stock SM75 build has an open compile-time blocker in its
+software-emulated BF16 decode-attention translation unit. The repository build
+applies `patches/ninfer-sm75-int8-kv-only.patch`, which omits that unused BF16
+KV decode instantiation and keeps the recommended INT8 KV path. TokenFurnace
+rejects `KV_DTYPE=bf16` before launching the patched server or native benchmark.
+
+The local build environment uses CUDA 12.9 because NInfer requires CUDA 12.8
+or newer:
+
+```bash
+conda create -y -p /home/algore/.conda/envs/ninfer-build \
+  -c nvidia -c conda-forge \
+  cuda-toolkit=12.9 cuda-nvtx-dev=12.9 ffmpeg=6.1 \
+  'libcurl>=7.85' pkg-config cmake=3.28 ninja
+
+./scripts/setup-qwen3.8-27b.sh ninfer-groupwise-int-1gpu-mtp3
+```
+
+This installs the runtime under `/home/algore/ninfer-2080ti-22g`, builds
+`ninfer`, `ninfer-serve`, and `ninfer_bench` for `sm_75`, and downloads the
+pinned historical model to `/home/algore/models/qwen3.8-27b-ninfer-v2`.
+Setup verifies its container header, manifest version, filename, size, and
+SHA-256 before reporting success.
+
+The repository's current default revision instead serves a 20,437,521,664-byte
+container-v3 artifact (`NINFER\0\x03`, SHA-256
+`81f924d440c27261d820c19a9f8d45794c5aee410f8a68bd358133fa8c0375da`).
+Its manifest requires `Neroued/ninfer` revision
+`98dada0e03cb073fd07f905400b5904bc6e82759` or newer and names `sm_120a`; the
+pinned Turing fork correctly rejects it as non-v2. That failed attempt remains
+documented in [PERFORMANCE.md](PERFORMANCE.md).
+
+For the measured short 256-token API request, MTP-3 delivered 22.89 tok/s on
+the first request and 22.27 tok/s on the second, versus 19.94 and 19.25 tok/s
+for MTP-0. Use MTP-3 for similar interactive serving. Draft acceptance is
+workload-dependent: the native corpus accepted only 26.5% of MTP drafts and
+made MTP-3 decode 35.7% slower than MTP-0, so retain MTP-0 for low-acceptance
+workloads. The historical v2 chat template also exposes a stray `</think>`
+prefix on a correct non-thinking answer and failed strict exact-string
+requests. See [PERFORMANCE.md](PERFORMANCE.md) for the controlled comparison
+and correctness caveats.

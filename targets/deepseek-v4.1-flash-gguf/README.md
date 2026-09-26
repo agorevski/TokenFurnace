@@ -24,8 +24,15 @@ DS4_CUDA_NO_SCORE_TILE=1 \
 The automatic SSD-streaming cache uses available memory for weights and
 experts; Engram rows remain disk-backed. Do not assume the Q4 throughput
 applies to Q2. The CUDA score-tile fallback was required on this host for
-Q4; Q2's load and generation must be checked independently before treating
-this command as a validated deployment.
+Q4; Q2 loaded and generated correct text with that same fallback.
+
+**Measured on this host:** single-GPU Q2 native 512-/4096-token prefill
+reached 8.73/39.93 tokens/s and 32-token decode reached 2.66/2.33
+tokens/s respectively. Three no-thinking API requests with the same
+27-token prompt each generated 40 tokens, taking 24.86-28.11 seconds
+end to end. See [PERFORMANCE.md](PERFORMANCE.md) for the exact workload,
+raw logs, and why Q2 and Q4 results cannot be treated as a same-precision
+speedup.
 
 Current DwarfStar V4.1 CUDA does not support in-process four-GPU tensor
 parallelism. Its network tensor-parallel Q2 mode is designed for two

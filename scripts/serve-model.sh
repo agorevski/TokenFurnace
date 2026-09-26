@@ -46,6 +46,7 @@ done < "$profile_file"
 
 case "$BACKEND" in
   llama.cpp) source "$SCRIPT_DIR/backends/llama-cpp.sh" ;;
+  ninfer) source "$SCRIPT_DIR/backends/ninfer.sh" ;;
   vllm) source "$SCRIPT_DIR/backends/vllm.sh" ;;
   vllm-docker) source "$SCRIPT_DIR/backends/vllm-docker.sh" ;;
   *) die "unsupported backend: $BACKEND" ;;

@@ -2,6 +2,111 @@
 
 ## Measured results
 
+### NInfer container-v2 MTP-0 / MTP-3 comparison (2026-09-25)
+
+**Measured** on GPU 0 with the official
+`neroued/Qwen3.8-27B-NInfer` artifact pinned to Hugging Face revision
+`3526913004b1cf552cb57b88d6a5c6f5e4a89a70`. The container-v2 file is
+18,210,531,328 bytes with SHA-256
+`eec39564993d6e9c7d5e383382a760f093465c9d163ec9a1bd6b80199514bf3e`.
+The runtime was `mr-september/ninfer-2080ti-22g` base
+`6460bf03a86f1288dc7b240d70c30887199099af` plus the repository's SM75
+INT8-KV-only patch, represented in the build checkout by child commit
+`9a1db033585f3298efe005f836378b557d9862a5`. CUDA compile/runtime was 12.9,
+the driver exposed CUDA 13.0, and the binaries targeted `sm_75`.
+
+Both native profiles used GPU 0 only, 8192 maximum context, INT8 group-64 KV,
+1024-token prefill chunks, CUDA Graph decode, one warmup, and five retained
+repetitions. Values are mean +/- standard deviation in tokens/second:
+
+| Profile | 512 prefill | 4096 prefill | 128 decode |
+|---|---:|---:|---:|
+| **MTP-0** | **84.47 +/- 2.01** | **79.29 +/- 0.78** | **18.34 +/- 0.09** |
+| MTP-3, optimized proposal head | 82.30 +/- 2.71 | 78.25 +/- 0.22 | 11.79 +/- 0.01 |
+
+On the native corpus, MTP-3 changed 512 prefill by **-2.6%**, 4096 prefill by
+**-1.3%**, and decode by **-35.7%**, using
+`(MTP3 / MTP0 - 1) * 100`. It accepted 280 of 1,055 drafted tokens
+(**26.5%**) across the five decode repetitions, so proposal overhead exceeded
+the accepted-token benefit.
+
+Each server was started separately with prefix reuse disabled, greedy decoding,
+no thinking requested, and one 8192-token slot. The first and second harness
+requests used the same 19-token prompt and requested exactly 256 output
+tokens. All completed 256 tokens with finish reason `length`. Server logs
+reported zero prefix-cache hits, so the second request is startup/JIT-steady
+but is **not** a prompt-cache hit:
+
+| Profile | First request: latency / output rate | Second request: latency / output rate |
+|---|---:|---:|
+| MTP-0 | 12.839 s / 19.94 tok/s | 13.298 s / 19.25 tok/s |
+| **MTP-3** | **11.184 s / 22.89 tok/s** | **11.496 s / 22.27 tok/s** |
+
+MTP-3 improved end-to-end output throughput by **14.8%** on the first request
+and **15.7%** on the second. It accepted 175 of 237 drafted tokens
+(**73.8%**) in each timed request, explaining why this workload benefited
+while the native corpus regressed. The second request was 3.4% slower for
+MTP-0 and 2.7% slower for MTP-3. GPU 0 reached 85-87 C after each request
+pair, so the first/second difference includes thermal state. MTP-0 used
+17,229 MiB after load and MTP-3 used 18,031 MiB.
+
+Both profiles passed a deterministic arithmetic generation: the response
+contained the correct final numeral `4`, used four completion tokens, and
+finished with `stop`. The historical template emitted the visible prefix
+`</think>` despite `--no-thinking`. A stricter exact-string request failed on
+both profiles: MTP-0 reasoned instead of returning only the marker, while
+MTP-3 returned the marker and then reasoning; both reached the 32-token limit.
+This is a retained template/instruction-following caveat.
+
+MTP-3 is recommended for short interactive API generations similar to the
+measured request, but it is not a universal decode winner. Use MTP-0 for
+low-acceptance workloads or when native decode throughput matters. Raw native
+JSON, API JSON, request JSONL, correctness responses and failures, server
+logs, PIDs and stop records, hashes, and GPU samples are retained under
+`.benchmark-runs/qwen3.8-27b/20260925T223038Z-ninfer-v2/`.
+
+### NInfer latest-revision v3 compatibility attempt (2026-09-25)
+
+**Failed.** No throughput value was retained because the exact requested
+artifact cannot be opened by the pinned Turing fork. The artifact was
+`neroued/Qwen3.8-27B-NInfer` `qwen3_8_27b.ninfer`, 20,437,521,664 bytes,
+SHA-256
+`81f924d440c27261d820c19a9f8d45794c5aee410f8a68bd358133fa8c0375da`.
+Its eight-byte prefix is `NINFER\0\x03` (container v3). The installed
+`mr-september/ninfer-2080ti-22g` runtime was pinned at
+`6460bf03a86f1288dc7b240d70c30887199099af`, with
+`patches/ninfer-sm75-int8-kv-only.patch` applied and binaries built for
+`sm_75`. That reader accepts `NINFER\0\x02` and rejected the file with
+`artifact magic is not NInfer v2`.
+
+The MTP-0 and MTP-3 NInfer profile shapes then in the working tree were
+attempted through
+`scripts/benchmark-native.sh` with GPU 0, INT8 KV, one warmup, five requested
+repetitions, 512- and 4096-token prefill, and 128-token decode. Both failed
+during artifact loading before a timed repetition. Both server configurations
+were also started separately: the process bound its socket, then model loading
+failed before the endpoint became healthy. Cold and steady 256-token API
+requests and the correctness request were therefore deliberately not sent.
+There is consequently no valid generated text, finish reason, API JSON, or
+native rate to report.
+
+The downloaded artifact manifest independently identifies container version
+3, requires `Neroued/ninfer` revision
+`98dada0e03cb073fd07f905400b5904bc6e82759` or newer, and names `sm_120a`;
+that is not the requested pinned SM75 runtime. GPU 0 was idle before the
+attempt (7 MiB display allocation, 0% utilization, 34 C) and remained idle
+afterward (7 MiB, 0%, 35 C). GPUs 1-3 were not used. Repository and fork
+commits, patch and model hashes, profile snapshots, exact commands, native and
+server failure logs, server shell PIDs, topology/NVLink state, and before/after
+thermal and power samples are retained under
+`.benchmark-runs/qwen3.8-27b/20260925T034348Z-ninfer/`.
+
+This failure applies to the then-current default Hugging Face revision, not to
+all historical artifacts in the repository. The active NInfer profiles now pin
+historical revision `3526913004b1cf552cb57b88d6a5c6f5e4a89a70`, whose
+container-v2 artifact is compatible with the fork's reader. It is measured
+separately in the section above.
+
 ### Cold 32K prefill followed by 1K decode (2026-09-23 UTC)
 
 **Measured** in one OpenAI-compatible API request against the four-GPU

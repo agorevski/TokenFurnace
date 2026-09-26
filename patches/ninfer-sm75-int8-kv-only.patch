@@ -1,0 +1,63 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 95a31f0..6e1d83b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -18,6 +18,8 @@ project(ninfer-2080ti-22g LANGUAGES C CXX CUDA)
+ option(NINFER_BUILD_APPS "Build the NInfer CLI and server" ON)
+ option(BUILD_TESTING "Build NInfer tests" OFF)
+ option(NINFER_BUILD_BENCHMARKS "Build NInfer benchmarks" OFF)
++option(NINFER_SM75_INT8_KV_ONLY
++  "Omit pathological software-emulated BF16 decode attention from SM75 builds" OFF)
+ 
+ set(CMAKE_CXX_STANDARD 20)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+diff --git a/src/ops/launcher/gqa_attention_decode.cu b/src/ops/launcher/gqa_attention_decode.cu
+index ea28608..db9af3a 100644
+--- a/src/ops/launcher/gqa_attention_decode.cu
++++ b/src/ops/launcher/gqa_attention_decode.cu
+@@ -14,6 +14,12 @@
+ namespace ninfer::ops::detail {
+ namespace {
+ 
++#if defined(NINFER_SM75_INT8_KV_ONLY)
++constexpr bool kSm75Int8KvOnly = true;
++#else
++constexpr bool kSm75Int8KvOnly = false;
++#endif
++
+ // Supplies an upper bound for the device-side active-split policy over one explicit execution
+ // envelope. Eager calls normally pass an exact window; graph calls pass their target-private
+ // replay interval. The dtype-aware wrapper below adds the measured INT8 specializations.
+@@ -254,9 +260,13 @@ void gqa_attention_small_t_launch_for(const Tensor& q, CacheInput input, const T
+                     q, input, pos, scale, cache, invocation, logical_capacity,                     \
+                     implementation_window, splits, partial_acc, partial_m, partial_l, stream);     \
+             } else {                                                                               \
+-                launch_tc_partial_bf16<Geometry, (TOKENS), (WARPS), MultiBatch, Masked>(           \
+-                    q, input, pos, scale, cache, invocation, logical_capacity, splits,             \
+-                    partial_acc, partial_m, partial_l, stream);                                    \
++                if constexpr (kSm75Int8KvOnly) {                                                   \
++                    throw std::invalid_argument("SM75 build supports only INT8 KV cache");         \
++                } else {                                                                           \
++                    launch_tc_partial_bf16<Geometry, (TOKENS), (WARPS), MultiBatch, Masked>(       \
++                        q, input, pos, scale, cache, invocation, logical_capacity, splits,         \
++                        partial_acc, partial_m, partial_l, stream);                                \
++                }                                                                                  \
+             }                                                                                      \
+         };                                                                                         \
+         const bool masked = invocation.valid_columns != nullptr;                                   \
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 7121fd5..b5a4f9d 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -269,6 +269,11 @@ else()
+   list(APPEND NINFER_OPS_SOURCES ops/unsupported/nvfp4_unsupported_stubs.cpp)
+ endif()
+ 
++if(CMAKE_CUDA_ARCHITECTURES STREQUAL "75" AND NINFER_SM75_INT8_KV_ONLY)
++  set_source_files_properties(ops/launcher/gqa_attention_decode.cu PROPERTIES
++    COMPILE_DEFINITIONS NINFER_SM75_INT8_KV_ONLY=1)
++endif()
++
+ add_library(ninfer_ops STATIC ${NINFER_OPS_SOURCES})
+ ninfer_internal_includes(ninfer_ops)
+ ninfer_cuda_archive(ninfer_ops)

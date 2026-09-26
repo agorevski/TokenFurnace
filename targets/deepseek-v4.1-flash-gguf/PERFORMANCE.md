@@ -8,8 +8,55 @@ replacement is `DeepSeek-V4.1-Flash-Q2.gguf` from the same Hugging Face
 repository, expected size 365,713,686,528 bytes and upstream SHA-256
 `1ce6a8f8806205c13330d7ca287bd198331dc5ca35ccc5d8a9a92a188a6f6f42`.
 Q2's routed gate/up experts use `IQ2_XXS` and down experts use `Q2_K`;
-its 151.77 GiB main weights still exceed one RTX 8000's VRAM. Q2 load,
-output, and performance are **unmeasured** pending the completed download.
+its 151.77 GiB main weights still exceed one RTX 8000's VRAM.
+The DwarfStar downloader verified the complete file size and SHA-256
+locally (`.benchmark-runs/deepseek-v4.1-flash-gguf/q2-20260924T044501Z/download.log`).
+
+### Measured Q2 on this host
+
+September 24, 2026, `antirez/ds4` commit
+`0aaea5a238fb41a35106a551e73c8409dfb751ac`, built for `sm_75`;
+one Quadro RTX 8000 (GPU 0), CUDA SSD streaming, automatic expert-cache
+budget, `DS4_CUDA_NO_SCORE_TILE=1`, context 8192, prefill chunk 4096,
+and disk-backed Engram. The other three GPUs were idle. The model loaded
+and generated a correct two-token `READY` reply, then three correct
+40-token Python code answers with finish reason `stop`. Raw outputs,
+command, prompt hashes, and GPU snapshots are in
+`.benchmark-runs/deepseek-v4.1-flash-gguf/q2-20260924T044501Z/`.
+
+| Native `ds4-bench` prompt | Prefill | 32-token decode | First decode token | Subsequent 31 tokens |
+| --- | ---: | ---: | ---: | ---: |
+| 512 tokens | 8.73 tokens/s | 2.66 tokens/s | 981.533 ms | 2.80 tokens/s |
+| 4096 tokens | 39.93 tokens/s | 2.33 tokens/s | 1051.741 ms | 2.44 tokens/s |
+
+Each native row is **one** run at the stated frontier, 32 greedy decode
+tokens and allocated context 8192, using the byte-identical prompt files
+from the Q4 test. Cache state is not guaranteed identical across the
+independent model launches; these are observed rates, not error-bounded
+estimates of maximum performance.
+
+The API workload used one 27-token prompt asking for a Python `sum`
+function with an example, temperature zero, `think:false`, concurrency
+one and a 64-token limit. Each answer had **40 actual tokens**, `stop`
+finish reason, `cached_tokens=0`, and identical valid Python fenced code.
+The three end-to-end durations (including HTTP and prefill) were
+28.109, 24.932 and 24.859 s (mean 25.967 s); output tokens divided by
+those durations are 1.423, 1.604 and 1.609 tokens/s. Server-reported
+prefill/decode durations were 11.072/17.028, 10.432/14.499 and
+10.371/14.487 s; decode-only rates reported by the server were
+2.35, 2.76 and 2.76 tokens/s. The first separate 10-prompt-token /
+2-output-token smoke test took 9.263 s and is not folded into these
+figures. GPU 0 used 40,331 MiB VRAM and reached 52 C after the API runs.
+Thermal throttling indicators were not captured, so thermal equivalence
+is unverified. API long-prompt prefill and aggregate concurrency are
+unmeasured.
+
+Compared with the **historical Q4 result below**, Q2's observed native
+prefill was 77.1% faster at 512 tokens and 92.0% faster at 4096 tokens,
+while decode was 131.3% and 142.7% faster respectively; calculation is
+`100 * (Q2 rate / Q4 rate - 1)`. This changes **quantization and model
+bytes**, not topology. The API generated 40 tokens on Q2 versus 35 on Q4,
+so its elapsed times are not a token-matched latency comparison.
 
 ## Historical Q4 measurements (model deleted)
 

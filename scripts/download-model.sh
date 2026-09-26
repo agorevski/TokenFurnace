@@ -18,6 +18,9 @@ require_command hf
 mkdir -p "$MODEL_DIR"
 
 args=(download "$HF_REPO" --local-dir "$MODEL_DIR")
+if [[ -n "${HF_REVISION:-}" ]]; then
+  args+=(--revision "$HF_REVISION")
+fi
 if [[ -n "${DOWNLOAD_PATTERNS:-}" ]]; then
   IFS='|' read -r -a patterns <<< "$DOWNLOAD_PATTERNS"
   for pattern in "${patterns[@]}"; do
@@ -25,7 +28,7 @@ if [[ -n "${DOWNLOAD_PATTERNS:-}" ]]; then
   done
 fi
 
-printf 'Downloading %s for target=%s profile=%s to %s\n' \
-  "$HF_REPO" "$TARGET" "$PROFILE" "$MODEL_DIR"
+printf 'Downloading %s%s for target=%s profile=%s to %s\n' \
+  "$HF_REPO" "${HF_REVISION:+@$HF_REVISION}" "$TARGET" "$PROFILE" "$MODEL_DIR"
 df -h "$MODEL_DIR" | tail -1
 exec hf "${args[@]}"

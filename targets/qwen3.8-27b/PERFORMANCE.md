@@ -19,7 +19,6 @@
 | [llama.cpp b359 / Q4_K_M, GPU 3 layer](#four-gpu-optimization) | 512-token prefill | 692.19 | 11.66 |
 | [llama.cpp b359 / Q4_K_M, 4 GPUs layer](#four-gpu-optimization) | 512-token prefill | 681.56 | 2.24 |
 | [llama.cpp b359 / Q4_K_M, 4 GPUs layer repeat](#four-gpu-optimization) | 512-token prefill | 677.94 | 1.24 |
-| [llama.cpp b359 / Q4_K_M, GPU 3 current baseline](#gpu3-comparison) | 512-token prefill | 671.50 | 20.45 |
 | [llama.cpp b359 / Q4_K_M, 4 GPUs layer, matched sweep](#matched-topology) | 512-token prefill | 664.87 | 1.06 |
 | [NInfer SM75 / container-v2, MTP-0](#ninfer-v2) | 512-token prefill | 84.47 | 2.01 |
 | [NInfer SM75 / container-v2, MTP-3](#ninfer-v2) | 512-token prefill | 82.30 | 2.71 |
@@ -39,7 +38,6 @@
 | [llama.cpp b359 / Q4_K_M, GPU 0 layer](#matched-topology) | 4096-token prefill | 681.79 | 21.11 |
 | [llama.cpp b10298 / Q4_K_M, 1 GPU layer](#native-topology) | 4096-token prefill | 659.75 | 24.91 |
 | [llama.cpp b359 / Q4_K_M, GPU 3 layer](#four-gpu-optimization) | 4096-token prefill | 627.73 | 4.96 |
-| [llama.cpp b359 / Q4_K_M, GPU 3 current baseline](#gpu3-comparison) | 4096-token prefill | 619.16 | 2.31 |
 | [NInfer SM75 / container-v2, MTP-0](#ninfer-v2) | 4096-token prefill | 79.29 | 0.78 |
 | [NInfer SM75 / container-v2, MTP-3](#ninfer-v2) | 4096-token prefill | 78.25 | 0.22 |
 
@@ -52,18 +50,14 @@
 | [vLLM 0.21 / W4A16 AWQ, MTP-1](#vllm-awq) | 5 | 17 | 167.09 | — | — | — |
 | [vLLM 0.21 / W4A16 AWQ, MTP-1](#vllm-awq) | 4 | 17 | 145.26 | — | — | — |
 | [vLLM 0.21 / W4A16 AWQ, no MTP](#vllm-awq) | 5 | 17 | 133.82 | — | — | — |
-| [vLLM 0.21 / W4A16 AWQ, MTP-2, GPU 3](#gpu3-comparison) | 4 | 1,202 | 124.81 | — | 839 ms | 27.81 ms |
 | [vLLM 0.21 / W4A16 AWQ, no MTP](#vllm-awq) | 4 | 17 | 111.00 | — | — | — |
 | [vLLM 0.21 / W4A16 AWQ, MTP-2](#vllm-awq) | 2 | 17 | 86.19 | — | — | — |
 | [vLLM 0.21 / W4A16 AWQ, MTP-1](#vllm-awq) | 2 | 17 | 70.94 | — | — | — |
 | [vLLM 0.21 / official FP16, TP2](#official-fp16) | 4 | — | 70.68 | — | — | — |
-| [vLLM 0.21 / W4A16 AWQ, MTP-2, GPU 3](#gpu3-comparison) | 2 | 1,202 | 67.38 | — | 1,550 ms | 23.25 ms |
 | [vLLM 0.21 / W4A16 AWQ, no MTP](#vllm-awq) | 2 | 17 | 56.68 | — | — | — |
-| [HyperQwen 0.29 / W4A16 AutoRound, eager](#gpu3-comparison) | 4 | 1,538 | 53.53 | — | 1,263 ms | 70.06 ms |
 | [vLLM 0.21 / W4A16 AWQ, MTP-2, warm](#vllm-awq) | 1 | 17 | 53.36 | — | — | — |
 | [llama.cpp b359 / Q4_K_M, 4 GPUs, 262K context](#four-gpu-optimization) | 1 | 17 | 51.50 | — | — | — |
 | [llama.cpp b359 / Q4_K_M, 4 GPUs tensor](#four-gpu-optimization) | 1 | — | 48.86 | — | — | — |
-| [vLLM 0.21 / W4A16 AWQ, MTP-2, GPU 3](#gpu3-comparison) | 1 | 1,202 | 44.83 | — | 339 ms | 21.06 ms |
 | [llama.cpp b359 / Q4_K_M, NVLink 2-3, warm](#full-context-smoke) | 1 | 59 | 44.38 | — | — | — |
 | [vLLM 0.21 / W4A16 AWQ, MTP-1, warm](#vllm-awq) | 1 | 17 | 43.23 | — | — | — |
 | [llama.cpp b10298 / Q4_K_M, NVLink 2-3](#openai-server) | 1 | 71 | 42.97 | — | — | — |
@@ -71,94 +65,153 @@
 | [llama.cpp b359 / Q4_K_M, NVLink 2-3 tensor](#four-gpu-optimization) | 1 | — | 41.82 | — | — | — |
 | [vLLM 0.21 / official FP16, TP2, MTP-1, warm](#official-mtp1) | 1 | — | 31.44 | — | — | — |
 | [vLLM 0.21 / W4A16 AWQ, no MTP, warm](#vllm-awq) | 1 | 17 | 31.10 | — | — | — |
-| [HyperQwen 0.29 / W4A16 AutoRound, eager](#gpu3-comparison) | 2 | 1,538 | 27.18 | — | 652 ms | 71.30 ms |
-| [llama.cpp b359 / Q4_K_M, GPU 3, queued clients](#gpu3-comparison) | 4 | 1,538 | 25.99 | — | 22,609 ms | 36.91 ms |
-| [llama.cpp b359 / Q4_K_M, GPU 3](#gpu3-comparison) | 1 | 1,538 | 25.82 | — | 636 ms | 36.39 ms |
 | [llama.cpp b359 / Q4_K_M, 4 GPUs, cold 32K](#cold-32k) | 1 | 32,768 | 23.53 | — | — | — |
 | [NInfer SM75 / container-v2, MTP-3, first request](#ninfer-v2) | 1 | 19 | 22.89 | — | — | — |
 | [NInfer SM75 / container-v2, MTP-3, steady request](#ninfer-v2) | 1 | 19 | 22.27 | — | — | — |
 | [NInfer SM75 / container-v2, MTP-0, first request](#ninfer-v2) | 1 | 19 | 19.94 | — | — | — |
 | [NInfer SM75 / container-v2, MTP-0, steady request](#ninfer-v2) | 1 | 19 | 19.25 | — | — | — |
 | [vLLM 0.21 / official FP16, TP2](#official-fp16) | 1 | — | 16.99 | — | — | — |
-| [HyperQwen 0.29 / W4A16 AutoRound, eager](#gpu3-comparison) | 1 | 1,538 | 14.22 | — | 375 ms | 69.10 ms |
 
-The tables summarize valid retained measurements and are sorted by throughput
-within each workload class. Rows with different input lengths, batch sizes,
-cache states, checkpoints, quantizations, or hardware layouts are not direct
+The tables index historical retained measurements; sorted positions do not
+establish a cross-artifact winner. The new GPU 3 independent baselines appear
+only in the detailed sections below. Rows with different input lengths, batch
+sizes, cache states, checkpoints, quantizations, or hardware layouts are not direct
 controlled comparisons. An em dash means the source evidence did not retain
 that metric.
 
 ## Detailed results
 
 <a id="gpu3-cold-prefill"></a>
-### GPU 3 cold-prefill cross-runtime baseline
+### GPU 3 standalone cold-prefill baselines (2026-09-26)
 
-**Unmeasured.** `benchmark.env` now fixes the comparison workload at a
-262,144-token served context, 8,192-token batch cap, cold cache, temperature
-zero, one concurrent request, an exact 32,768-token prompt, and 1,024 requested
-output tokens. The prompt fixture SHA-256 is
-`24a8b4877ce617a49b04a55f3a1e6dabc61664e9060a68c33442fc5c9893af29`.
+**Measured**, separately, with physical GPU 3 and a served context limit of
+**262,144 tokens in every run**. The committed prompt fixture has SHA-256
+`4afb1718fe125320e62ff99962e7fe9056bc3e14c4273840f4acf83182b2cefe`;
+server-side chat tokenization and response usage both confirmed **exactly
+32,768 input tokens** for each runtime. Two repetitions per runtime, after a
+short warmup, used the same UTF-8 prompt bytes, temperature zero, one
+generated token, one active request, and disabled prefix caching. Each
+response completed with `finish_reason=length`, one output token, and zero
+cached prompt tokens. The throughput below is **input tokens / HTTP elapsed
+time**, including tokenization, transfer, and the one generated token, not
+kernel-only prefill; the vLLM APIs do not report a separate prompt kernel
+duration.
 
-The paired profiles are `llama-cpp-q4km-1gpu-ctx262k-prefill` and
-`vllm-awq-int4-1gpu-mtp2-gpu3-prefill`. Both use physical GPU 3 and disable
-prefix caching. This is a workload-controlled comparison, not a strict
-same-artifact comparison: llama.cpp uses Q4_K_M GGUF, while vLLM uses W4A16
-AWQ with MTP-2, and vLLM has no direct equivalent for llama.cpp's 2,048-token
-microbatch.
+**HyperQwen 0.29, W4A16 AutoRound** (`SPEC=off`, eager FP16,
+`TRITON_ATTN`, 2,048 batched tokens, `MAX_SEQS=4`, `GPU_UTIL=0.85`,
+`--no-enable-prefix-caching`): 264.091 and 265.397 seconds, or **124.08
+and 123.47 input tok/s**. Its total KV pool held 410,122 tokens, which
+is not a per-request context guarantee. The local checkpoint's eight
+safetensors files total 16,744,671,312 bytes; its config and index hashes,
+effective launch arguments, raw responses and GPU samples are retained.
 
-<a id="gpu3-comparison"></a>
-### GPU 3 single-card baselines versus HyperQwen (2026-09-26)
+**llama.cpp build 359, Q4_K_M GGUF**
+(`llama-cpp-q4km-1gpu-ctx262k-prefill`, SHA-256
+`7b2aec3b9ababdfd75aa17552ee95607d866e44decf547f6f12fcef85cc89f1b`,
+one slot, layer split, CUDA, flash attention, FP16 KV, 8,192 batch / 2,048
+ubatch, prompt cache off): 59.083 and 61.699 seconds, or **554.61 and
+531.10 input tok/s** end-to-end. Its server additionally reported
+**556.77 and 531.98 tok/s** for prompt processing alone.
 
-**Measured** on physical GPU 3 only. Five native repetitions with llama.cpp
-build 359 (`035e227`), Unsloth Q4_K_M GGUF (17,106,773,984 bytes, SHA-256
-`7b2aec3b9ababdfd75aa17552ee95607d866e44decf547f6f12fcef85cc89f1b`),
-the existing `llama-cpp-q4km-1gpu` profile (layer split, flash attention,
-FP16 KV, batch 8192 / ubatch 2048) gave:
-
-| Native workload | Mean tok/s | Standard deviation |
-|---|---:|---:|
-| 512-token prefill | 671.50 | 20.45 |
-| 4096-token prefill | 619.16 | 2.31 |
-| 128-token decode | 27.82 | 0.10 |
-
-For the server comparison, a single GPU 3 was used sequentially, never shared
-between engines. The input file was HyperQwen's `bench/prompts_real.jsonl`
-(SHA-256 `27da4fd8b2dcc133b98cec54bc337c34f5acb1b6372cc2fea1d8a92da9c78650`).
-The same vLLM `bench serve` client sent eight fixed real prompts per run with
-one warmup, temperature zero, 256 generated tokens per request, and no shuffle.
-All timed runs completed 8/8 requests and generated 2,048 output tokens each.
-
-| GPU 3 runtime / checkpoint | Requests at once | Input tokens | Duration | Aggregate output tok/s | Mean TTFT | Mean TPOT |
-|---|---:|---:|---:|---:|---:|---:|
-| HyperQwen 0.29, W4A16 AutoRound, eager, 4K context | 1 | 1,538 | 143.97 s | 14.22 | 375 ms | 69.10 ms |
-| HyperQwen, same profile | 2 | 1,538 | 75.34 s | 27.18 | 652 ms | 71.30 ms |
-| HyperQwen, same profile | 4 | 1,538 | 38.26 s | 53.53 | 1,263 ms | 70.06 ms |
-| llama.cpp Q4_K_M, 65K context, one server slot | 1 | 1,538 | 79.32 s | 25.82 | 636 ms | 36.39 ms |
-| llama.cpp, same profile (requests queue) | 4 | 1,538 | 78.79 s | 25.99 | 22,609 ms | 36.91 ms |
-| vLLM 0.21, AWQ W4A16 + MTP-2, 262K context | 1 | 1,202 | 45.69 s | 44.83 | 339 ms | 21.06 ms |
-| vLLM, same profile | 2 | 1,202 | 30.40 s | 67.38 | 1,550 ms | 23.25 ms |
-| vLLM, same profile | 4 | 1,202 | 16.41 s | 124.81 | 839 ms | 27.81 ms |
-
-The vLLM AWQ rows use a different checkpoint/tokenizer and chat template,
-which account for their **1,202 rather than 1,538 input tokens**; these rates
-are useful serving expectations, not a same-model/same-tokenization speedup.
-HyperQwen used `SPEC=off`, FP16 model/KV, Triton attention, eager execution,
-`MAX_LEN=4096 MAX_SEQS=4 GPU_UTIL=0.80`; vLLM AWQ used the new
-`vllm-awq-int4-1gpu-mtp2-gpu3` profile, identical to the GPU 1 profile except
-for device selection. The AWQ model and MTP head SHA-256 hashes are
+**vLLM 0.21, W4A16 AWQ with MTP-2**
+(`vllm-awq-int4-1gpu-mtp2-gpu3-prefill`, FP16, Triton attention,
+8,192 batched tokens, `MAX_SEQS=8`, `GPU_UTIL=0.94`, APC off):
+293.273 and 292.228 seconds, or **111.73 and 112.13 input tok/s**.
+The AWQ model and MTP head SHA-256 hashes are
 `15c5b07049149c73236254d53eca1d2f3274f9fb6803540ca47b1ce657dcf583`
 and `90fa0e3eed5a647c035c6df9ecabc416c0f8d573ff84ac12485b085f00a7cdf2`.
-GPU 3 reached 86 C on HyperQwen's concurrency-4 run. The llama.cpp profile
-has `PARALLEL=1`, so its four-client row measures queueing, not parallel
-generation. Every server passed a separate arithmetic generation check.
 
-Raw native JSON, API JSON, server logs, model checksums, profile snapshots,
-correctness responses and GPU samples are retained in
-`.benchmark-runs/qwen3.8-27b/20260926T-gpu3-comparison/`; HyperQwen's
-corresponding output is in the ignored sibling checkout at
-`bench/results/turing-gpu3-20260926/`. Cold random-prompt prefill and the
-supported 32K-context coding-agent check are described in that checkout's
-`docs/turing.md`. Neither a 262K prompt nor a long-concurrency soak was run.
+These are **three independent serving expectations**, not a ranked
+cross-runtime comparison: AutoRound, AWQ, and Q4_K_M have different
+quantized weights and kernels, and the runtimes use different internal
+batching and attention implementations. GPU 3 reached 88 C on the AWQ
+after-run sample; rates may be affected by sustained thermals. The
+32K input validates only a 32K prefill *inside* the 262K limit, not a
+262K-token prefill. Raw commands, prompt, calibration script, tokenization
+probes, responses, server logs, temperatures, and the initial failed
+llama.cpp `/tokenize` attempt (replaced by `/apply-template` plus
+`/tokenize`) remain under
+`.benchmark-runs/qwen3.8-27b/20260926T1909Z-32k-gpu3/`.
+
+<a id="gpu3-long-decode"></a>
+### GPU 3 similar-INT4 long-request baselines (2026-09-26)
+
+**Measured**, two independent repetitions per configuration on physical GPU
+3 with the same prompt bytes and **32,768 input / 1,024 output tokens** per
+request. All served a **262,144-token context**, used temperature zero,
+`ignore_eos=true` to hold output length fixed, one active request, and
+disabled prompt/prefix caching. Response usage reported zero cached tokens;
+all six responses contained substantive text and ended with
+`finish_reason=length`. Streaming time to first output (TTFT) includes
+tokenization, prefill, and the first generated token; **subsequent output
+tok/s is approximated as 1,023 / (HTTP completion time - TTFT)**. A streaming
+chunk can contain more than one token, particularly with MTP, so this is not
+an exact per-token decode rate, kernel-only prefill, or aggregate concurrent
+throughput.
+
+| Independently tuned checkpoint / runtime | TTFT (s), runs 1 / 2 | HTTP total (s), runs 1 / 2 | Approx. subsequent output (tok/s), runs 1 / 2 |
+|---|---:|---:|---:|
+| AutoRound W4A16 / HyperQwen 0.29, eager, no speculation | 264.287 / 266.041 | 334.970 / 337.424 | 14.47 / 14.33 |
+| AWQ W4A16 / vanilla vLLM 0.21, MTP-2 | 299.882 / 298.122 | 438.209 / 436.901 | 7.40 / 7.37 |
+| Unsloth Q4_K_M GGUF / llama.cpp build 359, no MTP | 61.556 / 62.276 | 102.369 / 102.805 | 25.07 / 25.24 |
+
+The earlier [one-token 32K tests](#gpu3-cold-prefill) isolate
+prefill-oriented end-to-end input rates on the same GPU, context, and prompt.
+The three checkpoints share a dense Qwen3.8-27B base and predominantly
+four-bit weights, **not the same quantized values**. AutoRound uses symmetric
+group-128 INT4 linear weights and INT8 embeddings/head; AWQ uses asymmetric
+group-128 INT4 linear weights with a separate MTP head. Q4_K_M contains a
+mixture of Q4_K, Q5_K, Q6_K and other tensor types and has no MTP tensors.
+HyperQwen's installed vLLM fork rejects the GGUF load format; vanilla vLLM's
+GGUF loader rejects the `qwen3_5` model type for this artifact. A same-GGUF
+MTP-2 test is therefore **unmeasured**, not an AWQ-to-GGUF speedup.
+
+These numbers characterize separate supported serving setups, not an
+attribution of performance differences to runtime alone. HyperQwen used
+FP16 KV, Triton attention, 2,048 batched tokens, and `GPU_UTIL=0.85`;
+AWQ used its MTP-2 head, FP16, Triton attention, 8,192 batched tokens,
+`GPU_UTIL=0.94` and CUDA graphs; llama.cpp used CUDA flash attention,
+FP16 KV, 8,192 batch / 2,048 ubatch and one server slot. GPU 3 reached
+86 C (HyperQwen), 84 C (AWQ), and 88 C (llama.cpp) in after-run samples;
+thermal and kernel effects cannot be separated. Raw request/response text,
+streaming harness, server logs, checkpoint provenance, failure diagnostics,
+and GPU samples are retained in
+`.benchmark-runs/qwen3.8-27b/similar-int4-gpu3-32k-1024/`.
+
+<a id="gpu3-comparison"></a>
+### GPU 3 standalone short-request serving baselines at 262K context
+
+With the same GPU 3 and **262,144-token served context**, eight real prompts
+from HyperQwen's `bench/prompts_real.jsonl` were run with 256 generated
+tokens each, temperature zero, and one warmup per run. Every run finished
+8/8 requests with 2,048 output tokens. HyperQwen and llama.cpp disabled
+prompt caching; AWQ had APC enabled, so its cache-hit count was not held
+equal to the other runs. The AWQ tokenizer
+and chat template counted **1,202** input tokens, versus **1,538** for the
+other two artifacts; their results are not comparable across quantizations.
+
+**HyperQwen W4A16 AutoRound, eager/no speculation**, prefix caching disabled:
+at concurrency 1, 2, and 4, aggregate output rates were **14.55, 27.40,
+and 53.33 tok/s** (mean TTFT 371, 647, and 1,255 ms).
+
+**llama.cpp Q4_K_M**, one server slot with prompt caching disabled:
+at concurrency 1, **25.30 tok/s** (mean TTFT 815 ms); at concurrency 4,
+**24.77 tok/s** (mean TTFT 24,041 ms). Four clients queued behind the one
+slot; that row does not measure concurrent generation.
+
+**vLLM AWQ W4A16 + MTP-2**, with its 262K profile and aligned prefix
+caching enabled: at concurrency 1, 2, and 4, aggregate output rates were
+**44.83, 67.38, and 124.81 tok/s** (mean TTFT 339, 1,550, and 839 ms).
+This is a separately tuned, previously retained 262K serving run; it used
+APC whereas the dedicated 32K prefill run above disabled APC. Do not
+combine the short-request results into a cross-checkpoint speedup.
+
+The 262K short-request reruns, long-prefill samples, profile snapshots,
+and GPU samples are in
+`.benchmark-runs/qwen3.8-27b/20260926T1909Z-32k-gpu3/`. The original
+4K/65K short-request runs remain in the historical ignored directory
+`.benchmark-runs/qwen3.8-27b/20260926T-gpu3-comparison/`, but are excluded
+from this 262K baseline and from the summary tables.
 
 <a id="ninfer-v2"></a>
 ### NInfer container-v2 MTP-0 / MTP-3 comparison (2026-09-25)

@@ -24,7 +24,7 @@ DeltaNet layers and 16 full-attention layers. It has a 5120-wide hidden state,
 | `llama-cpp-q4km-2gpu-tensor-ctx8k` | NVLink pair 2-3 | Matching-context topology and API comparison |
 | `llama-cpp-q4km-2gpu-tensor` | NVLink pair 2-3 | Faster-starting 65,536-token context |
 | `llama-cpp-q4km-1gpu` | GPU 3 | Lower resource use; leaves GPU 2 free |
-| `llama-cpp-q4km-1gpu-ctx262k-prefill` | GPU 3 | Cold-cache 32K-prefill baseline in a 262K context |
+| `llama-cpp-q4km-1gpu-ctx262k-prefill` | GPU 3 | Standalone cold-cache 32K-prefill baseline in a 262K context |
 | `llama-cpp-q4km-2gpu` | NVLink pair 2-3 | Layer-split baseline |
 | `vllm-official-fp16-tp2` | NVLink pair 2-3 | Official unquantized safetensors; BF16 cast to native Turing FP16 |
 | `vllm-official-fp16-tp2-mtp1` | NVLink pair 2-3 | Fastest official-weight latency; built-in MTP-1 |
@@ -34,7 +34,7 @@ DeltaNet layers and 16 full-attention layers. It has a 5120-wide hidden state,
 | `vllm-awq-int4-1gpu-mtp1` | GPU 1 | One-token speculative control |
 | `vllm-awq-int4-1gpu-mtp2` | GPU 1 | Highest measured throughput for 2-5 concurrent coding sessions |
 | `vllm-awq-int4-1gpu-mtp2-gpu3` | GPU 3 | Same AWQ/MTP-2 configuration on the preferred single-GPU performance card |
-| `vllm-awq-int4-1gpu-mtp2-gpu3-prefill` | GPU 3 | Matching cold-cache 32K-prefill workload in a 262K context |
+| `vllm-awq-int4-1gpu-mtp2-gpu3-prefill` | GPU 3 | Standalone AWQ cold-cache 32K-prefill baseline in a 262K context |
 | `ninfer-groupwise-int-1gpu-mtp0` | GPU 0 | Historical container-v2 baseline; faster on the low-acceptance native corpus |
 | `ninfer-groupwise-int-1gpu-mtp3` | GPU 0 | Historical container-v2 MTP-3; measured short-request API winner |
 
@@ -122,12 +122,19 @@ A 262K-token *prefill* has not been benchmarked.
 
 ## Reproducible benchmark baseline
 
-[`benchmark.env`](benchmark.env) defines the shared GPU 3 cold-prefill
-workload, and [`benchmark-prompt.txt`](benchmark-prompt.txt) is its committed
-32,768-token prompt fixture. Both comparison profiles use a 262,144-token
-context, an 8,192-token batch cap, disabled prefix caching, temperature zero,
-and one request producing either one prefill-isolation token or 1,024 fixed
-output tokens.
+[`benchmark.env`](benchmark.env) records the GPU 3 cold-prefill workload,
+and [`benchmark-prompt.txt`](benchmark-prompt.txt) is the exact prompt used
+in the measured **32,768-token** requests (SHA-256
+`4afb1718fe125320e62ff99962e7fe9056bc3e14c4273840f4acf83182b2cefe`).
+HyperQwen AutoRound, llama.cpp Q4_K_M, and vLLM AWQ+MTP-2 each served with
+a **262,144-token context** and prefix caching disabled; two one-token
+prefill-oriented requests per runtime were measured on GPU 3. The long
+prompt's token count was confirmed separately against each server's chat
+template and response usage. The 1,024-token output setting in
+`benchmark.env` was also measured twice per runtime with the same uncached
+32K prompt, GPU 3 and 262K served context; see the
+[long-request results](PERFORMANCE.md#gpu3-long-decode) for TTFT and
+post-first-output token rates.
 
 Generate and retain the resolved settings before each run:
 
@@ -138,11 +145,14 @@ Generate and retain the resolved settings before each run:
   vllm-awq-int4-1gpu-mtp2-gpu3-prefill
 ```
 
-The workload is matched, but the model artifacts are not byte-identical:
-llama.cpp uses Q4_K_M GGUF while vLLM uses W4A16 AWQ with MTP-2. vLLM also has
-no direct `UBATCH_SIZE` equivalent. Report the result as a workload-controlled
-runtime/quantization comparison, not a strict same-artifact or fully mapped
-microbatch comparison.
+**Treat these as similar-INT4, independent baselines, not a same-weight runtime
+comparison.** The quantized weights differ (AutoRound versus AWQ versus
+Q4_K_M), and internal batching/quantized kernels are tuned differently.
+HyperQwen does not load GGUF; vanilla vLLM's loader cannot map this Qwen3.8
+GGUF, which also lacks an MTP head. vLLM has no direct `UBATCH_SIZE`
+equivalent. Measured rates, raw artifacts and limitations are
+in [PERFORMANCE.md](PERFORMANCE.md); the historical 4K/65K context results
+are not used as the current GPU 3 baseline.
 
 ## Official unquantized checkpoint
 
@@ -199,16 +209,16 @@ winner:
 ./scripts/serve-model.sh qwen3.8-27b vllm-awq-int4-1gpu-mtp2
 ```
 
-For a **GPU 3 performance comparison** against HyperQwen, select the
-otherwise identical GPU 3 profile instead:
+For a **standalone GPU 3 AWQ serving baseline**, select the otherwise
+identical GPU 3 profile instead:
 
 ```bash
 ./scripts/serve-model.sh qwen3.8-27b vllm-awq-int4-1gpu-mtp2-gpu3
 ```
 
-The GPU 3 rerun is documented in [PERFORMANCE.md](PERFORMANCE.md), alongside
-the single-GPU GPU 3 llama.cpp Q4_K_M baseline. These are different
-quantizations and runtimes, not a controlled same-weight kernel comparison.
+The GPU 3 run is documented in [PERFORMANCE.md](PERFORMANCE.md). HyperQwen
+AutoRound and llama.cpp Q4_K_M use different quantized weights, so do not
+rank these independent baselines or calculate speedups between them.
 
 This profile serves on port 8098 so it can coexist with the llama.cpp service
 on port 8092. It uses FP16 activations and KV cache, 262,144-token context,

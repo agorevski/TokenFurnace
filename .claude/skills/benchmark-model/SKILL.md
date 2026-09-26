@@ -18,7 +18,8 @@ Define these before changing a profile:
 - Primary metric: native prefill, native decode, single-request API latency, or
   aggregate API throughput.
 - Topologies to compare. This host has NVLink pairs 0-1 and 2-3, but traffic
-  between the pairs crosses PCIe.
+  between the pairs crosses PCIe. Use GPU 3 for single-GPU performance runs
+  and the 2-3 pair for NVLink performance runs.
 - Prompt length, output length, concurrency, context size, and cache state.
 
 Read the host constraints and a comparable target:
@@ -34,6 +35,13 @@ cat targets/<similar-target>/PERFORMANCE.md
 Important constraints:
 
 - Four Quadro RTX 8000 GPUs provide 48 GiB each and CUDA capability `sm_75`.
+- For performance measurements, use only physical GPU 3 for single-GPU runs
+  and physical GPUs 2,3 for NVLink-pair runs. Do not substitute GPUs 0/1 or
+  compare results from them as equivalent: their performance is suspected to
+  differ. A four-GPU topology test necessarily involves 0/1; run it only
+  when explicitly requested, and label it separately from GPU-3 baselines.
+  Inspect the effective `CUDA_VISIBLE_DEVICES` after loading every profile;
+  changing the caller's environment alone does not override a profile value.
 - Turing has no native BF16, TF32, FP8, or FP4 tensor-core execution. Use
   `DTYPE=half` for unquantized vLLM profiles.
 - FlashAttention 2 is unavailable. A framework may support CUDA 7.0+ while a
@@ -82,7 +90,7 @@ HF_REPO=<GGUF-repository>
 MODEL_DIR=/home/algore/models/<target>-gguf
 MODEL=$MODEL_DIR/<file-or-first-shard>.gguf
 DOWNLOAD_PATTERNS="<file-or-directory-glob>"
-CUDA_VISIBLE_DEVICES=0,1
+CUDA_VISIBLE_DEVICES=2,3
 TENSOR_SPLIT=1,1
 SPLIT_MODE=layer
 FLASH_ATTN=on
@@ -205,7 +213,7 @@ count, and thermal window fixed. Useful llama.cpp comparisons include:
 
 - one GPU versus one NVLink pair;
 - 2-GPU `layer` versus `tensor` split, if both load correctly;
-- one NVLink pair versus all four GPUs;
+- the GPU 2-3 NVLink pair versus all four GPUs, only when explicitly requested;
 - all-four-GPU layer split when the model cannot fit on a pair.
 
 Treat load failures, allocation failures, corruption, and unsupported split

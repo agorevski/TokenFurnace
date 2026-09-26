@@ -2,6 +2,59 @@
 
 ## Measured results
 
+### GPU 3 single-card baselines versus HyperQwen (2026-09-26)
+
+**Measured** on physical GPU 3 only. Five native repetitions with llama.cpp
+build 359 (`035e227`), Unsloth Q4_K_M GGUF (17,106,773,984 bytes, SHA-256
+`7b2aec3b9ababdfd75aa17552ee95607d866e44decf547f6f12fcef85cc89f1b`),
+the existing `llama-cpp-q4km-1gpu` profile (layer split, flash attention,
+FP16 KV, batch 8192 / ubatch 2048) gave:
+
+| Native workload | Mean tok/s | Standard deviation |
+|---|---:|---:|
+| 512-token prefill | 671.50 | 20.45 |
+| 4096-token prefill | 619.16 | 2.31 |
+| 128-token decode | 27.82 | 0.10 |
+
+For the server comparison, a single GPU 3 was used sequentially, never shared
+between engines. The input file was HyperQwen's `bench/prompts_real.jsonl`
+(SHA-256 `27da4fd8b2dcc133b98cec54bc337c34f5acb1b6372cc2fea1d8a92da9c78650`).
+The same vLLM `bench serve` client sent eight fixed real prompts per run with
+one warmup, temperature zero, 256 generated tokens per request, and no shuffle.
+All timed runs completed 8/8 requests and generated 2,048 output tokens each.
+
+| GPU 3 runtime / checkpoint | Requests at once | Input tokens | Duration | Aggregate output tok/s | Mean TTFT | Mean TPOT |
+|---|---:|---:|---:|---:|---:|---:|
+| HyperQwen 0.29, W4A16 AutoRound, eager, 4K context | 1 | 1,538 | 143.97 s | 14.22 | 375 ms | 69.10 ms |
+| HyperQwen, same profile | 2 | 1,538 | 75.34 s | 27.18 | 652 ms | 71.30 ms |
+| HyperQwen, same profile | 4 | 1,538 | 38.26 s | 53.53 | 1,263 ms | 70.06 ms |
+| llama.cpp Q4_K_M, 65K context, one server slot | 1 | 1,538 | 79.32 s | 25.82 | 636 ms | 36.39 ms |
+| llama.cpp, same profile (requests queue) | 4 | 1,538 | 78.79 s | 25.99 | 22,609 ms | 36.91 ms |
+| vLLM 0.21, AWQ W4A16 + MTP-2, 262K context | 1 | 1,202 | 45.69 s | 44.83 | 339 ms | 21.06 ms |
+| vLLM, same profile | 2 | 1,202 | 30.40 s | 67.38 | 1,550 ms | 23.25 ms |
+| vLLM, same profile | 4 | 1,202 | 16.41 s | 124.81 | 839 ms | 27.81 ms |
+
+The vLLM AWQ rows use a different checkpoint/tokenizer and chat template,
+which account for their **1,202 rather than 1,538 input tokens**; these rates
+are useful serving expectations, not a same-model/same-tokenization speedup.
+HyperQwen used `SPEC=off`, FP16 model/KV, Triton attention, eager execution,
+`MAX_LEN=4096 MAX_SEQS=4 GPU_UTIL=0.80`; vLLM AWQ used the new
+`vllm-awq-int4-1gpu-mtp2-gpu3` profile, identical to the GPU 1 profile except
+for device selection. The AWQ model and MTP head SHA-256 hashes are
+`15c5b07049149c73236254d53eca1d2f3274f9fb6803540ca47b1ce657dcf583`
+and `90fa0e3eed5a647c035c6df9ecabc416c0f8d573ff84ac12485b085f00a7cdf2`.
+GPU 3 reached 86 C on HyperQwen's concurrency-4 run. The llama.cpp profile
+has `PARALLEL=1`, so its four-client row measures queueing, not parallel
+generation. Every server passed a separate arithmetic generation check.
+
+Raw native JSON, API JSON, server logs, model checksums, profile snapshots,
+correctness responses and GPU samples are retained in
+`.benchmark-runs/qwen3.8-27b/20260926T-gpu3-comparison/`; HyperQwen's
+corresponding output is in the ignored sibling checkout at
+`bench/results/turing-gpu3-20260926/`. Cold random-prompt prefill and the
+supported 32K-context coding-agent check are described in that checkout's
+`docs/turing.md`. Neither a 262K prompt nor a long-concurrency soak was run.
+
 ### NInfer container-v2 MTP-0 / MTP-3 comparison (2026-09-25)
 
 **Measured** on GPU 0 with the official

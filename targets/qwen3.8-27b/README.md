@@ -32,6 +32,7 @@ DeltaNet layers and 16 full-attention layers. It has a 5120-wide hidden state,
 | `vllm-awq-int4-1gpu` | GPU 1 | W4A16 AWQ continuous-batching baseline |
 | `vllm-awq-int4-1gpu-mtp1` | GPU 1 | One-token speculative control |
 | `vllm-awq-int4-1gpu-mtp2` | GPU 1 | Highest measured throughput for 2-5 concurrent coding sessions |
+| `vllm-awq-int4-1gpu-mtp2-gpu3` | GPU 3 | Same AWQ/MTP-2 configuration on the preferred single-GPU performance card |
 | `ninfer-groupwise-int-1gpu-mtp0` | GPU 0 | Historical container-v2 baseline; faster on the low-acceptance native corpus |
 | `ninfer-groupwise-int-1gpu-mtp3` | GPU 0 | Historical container-v2 MTP-3; measured short-request API winner |
 
@@ -171,6 +172,17 @@ winner:
 ./scripts/download-model.sh qwen3.8-27b vllm-awq-int4-1gpu-mtp2
 ./scripts/serve-model.sh qwen3.8-27b vllm-awq-int4-1gpu-mtp2
 ```
+
+For a **GPU 3 performance comparison** against HyperQwen, select the
+otherwise identical GPU 3 profile instead:
+
+```bash
+./scripts/serve-model.sh qwen3.8-27b vllm-awq-int4-1gpu-mtp2-gpu3
+```
+
+The GPU 3 rerun is documented in [PERFORMANCE.md](PERFORMANCE.md), alongside
+the single-GPU GPU 3 llama.cpp Q4_K_M baseline. These are different
+quantizations and runtimes, not a controlled same-weight kernel comparison.
 
 This profile serves on port 8098 so it can coexist with the llama.cpp service
 on port 8092. It uses FP16 activations and KV cache, 262,144-token context,
